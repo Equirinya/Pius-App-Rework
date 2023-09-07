@@ -51,7 +51,8 @@ dependencies:
   animations: ^2.0.7
   carousel_slider: ^4.2.1
 
-
+  syncfusion_flutter_pdf: ^22.2.12
+  syncfusion_flutter_calendar: ^22.2.12
 
 dev_dependencies:
   isar_generator: ^3.0.5

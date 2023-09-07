@@ -11,6 +11,8 @@ import 'package:piusapp/pages/vertretungsplan.dart';
 
 import 'database.dart';
 
+import 'test.dart' as test;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -23,6 +25,7 @@ void main() async {
   timeDilation = 1.0;
   }
 
+  test.main();
 
   runApp(MyApp(isar: isar));
 }
