@@ -1,32 +1,30 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
-
-import 'package:http/http.dart' as http;
-
-import 'package:html/parser.dart';
-import 'package:html/dom.dart' as DOM;
+import 'package:syncfusion_flutter_calendar/calendar.dart';
 
 class StundenplanPage extends StatelessWidget {
   StundenplanPage({super.key, required this.isar});
 
   final Isar isar;
 
-  void loadStundenplan() {
-      http.get(Uri.parse("https://www.pius-gymnasium.de/stundenplaene/")).then((response) {
-      print(response.body);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        children: [
-          ElevatedButton(
-            onPressed: loadStundenplan,
-            child: const Text("load"),
+    return SafeArea(
+      child: Scaffold(
+        body: SfCalendar(
+          view: CalendarView.workWeek,
+          minDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday-1, hours: DateTime.now().hour, minutes: DateTime.now().minute)),
+          maxDate: DateTime.now().add(const Duration(days: 7)).add(Duration(days: min(5, max(0, 5-DateTime.now().weekday)), hours: 24- DateTime.now().hour, minutes: 60- DateTime.now().minute)),
+          timeSlotViewSettings: TimeSlotViewSettings(
+            startHour: 7,
+            timeInterval: Duration(minutes: 15),
+            endHour: 17,
+            timeFormat: "HH:mm",
+            timeIntervalHeight: 20,
           ),
-        ],
+        ),
       ),
     );
   }
