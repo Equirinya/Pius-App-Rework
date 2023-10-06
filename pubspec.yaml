@@ -1,4 +1,4 @@
-name: piusapp
+name: PiusApp
 description: A rework of the Pius App
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 0.8.0+80
 
 environment:
   sdk: '>=3.1.0-94.0.dev <4.0.0'
@@ -31,16 +31,17 @@ dependencies:
   flutter:
     sdk: flutter
 
-  http: ^0.13.4
+  http: ^1.1.0
   isar: ^3.0.5
   isar_flutter_libs: ^3.0.5 # contains the binaries
 
-  flutter_secure_storage: ^8.0.0
+  flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.0.15
 
   path_provider: ^2.0.9
   connectivity_plus: ^4.0.0
-
+  package_info_plus: ^4.1.0
+  intl: ^0.18.1
 
   flutter_native_splash: ^2.2.17
   flutter_launcher_icons: ^0.13.0
@@ -48,11 +49,16 @@ dependencies:
   cupertino_icons: ^1.0.2
 
   dynamic_color: ^1.6.4
+  flex_color_picker: ^3.3.0
+  flex_seed_scheme: ^1.4.0
   animations: ^2.0.7
   carousel_slider: ^4.2.1
 
-  syncfusion_flutter_pdf: ^22.2.12
-  syncfusion_flutter_calendar: ^22.2.12
+  syncfusion_flutter_pdf: ^23.1.38
+  syncfusion_flutter_calendar: ^23.1.38
+  syncfusion_localizations: ^23.1.38
+  flutter_localization: ^0.1.13
+  icalendar_parser: ^2.0.0
 
 dev_dependencies:
   isar_generator: ^3.0.5
