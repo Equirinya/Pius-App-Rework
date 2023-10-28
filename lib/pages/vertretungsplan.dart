@@ -11,7 +11,7 @@ class VertretungsplanPage extends StatefulWidget {
   const VertretungsplanPage({super.key, required this.isar, required this.loadingNotifier, required this.refresh});
 
   final Isar isar;
-  final ValueNotifier<bool> loadingNotifier;
+  final ValueNotifier<bool?> loadingNotifier;
   final VoidCallback refresh;
 
   @override
@@ -22,7 +22,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
   bool filter = false;
   late SharedPreferences prefs;
   bool initialized = false;
-  bool loading = false;
+  bool? loading = false;
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
     widget.loadingNotifier.addListener(() {
       setState(() {
         loading = widget.loadingNotifier.value;
-        print("loading: $loading");
+        // print("loading: $loading");
       });
     });
     super.initState();
@@ -132,7 +132,13 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
             const Divider(
               height: 1,
             ),
-          if (loading) LinearProgressIndicator(minHeight: 2),
+          if (loading ?? false) LinearProgressIndicator(minHeight: 2),
+          if(loading == null) Container(
+            width: double.infinity,
+            color: Theme.of(context).colorScheme.errorContainer,
+            alignment: Alignment.center,
+            child: Text("Konnte Vertretungsplan nicht aktualisieren"),
+          ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.only(left: 8, right: 8, top: 12, bottom: 72),

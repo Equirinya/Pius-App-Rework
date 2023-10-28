@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_launcher_icons/custom_exceptions.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -18,21 +17,22 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 const String baseUrl = "https://www.pius-gymnasium.de";
-const String stundenplanUrl = baseUrl + "/stundenplaene/"; //TODO put into settings
-const String vertretungsplanUrl = baseUrl + "/vertretungsplan/";
+const String stundenplanUrl = baseUrl + "/stundenplaene";
+const String vertretungsplanUrl = baseUrl + "/vertretungsplan";
 const String termineUrl = baseUrl + "/pius-kalender.ics";
 
 class ColorChangedNotification extends Notification {}
 
 Future<List<Appointment>> getPiusTermine() async {
-  http.Response response = await http.get(Uri.parse(termineUrl));
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  http.Response response = await http.get(Uri.parse(prefs.getString("website_url_termine") ?? termineUrl));
 
   if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode}");
   final iCalendar = ICalendar.fromString(response.body);
   List<Appointment> termine = iCalendar.data
       .map((e) {
         if (e["type"] != "VEVENT") return null;
-        DateTime startTime =  DateTime.parse((e["dtstart"] as IcsDateTime).dt);
+        DateTime startTime = DateTime.parse((e["dtstart"] as IcsDateTime).dt);
         DateTime endTime = DateTime.parse((e["dtend"] as IcsDateTime).dt);
         bool isAllDay = (startTime.hour == 0 && startTime.minute == 0 && endTime.hour == 0 && endTime.hour == 0);
         return Appointment(
@@ -55,32 +55,82 @@ Future<void> updateTermine() async {
   return;
 }
 
-Map<String, dynamic> appointmentToMap(Appointment appointment) =>
-    {"start": appointment.startTime.millisecondsSinceEpoch, "end": appointment.endTime.millisecondsSinceEpoch, "subject": appointment.subject, "isAllDay" : appointment.isAllDay};
+Map<String, dynamic> appointmentToMap(Appointment appointment) => {
+      "start": appointment.startTime.millisecondsSinceEpoch,
+      "end": appointment.endTime.millisecondsSinceEpoch,
+      "subject": appointment.subject,
+      "isAllDay": appointment.isAllDay
+    };
 
 Appointment appointmentFromMap(Map<String, dynamic> map) => Appointment(
-    startTime: DateTime.fromMillisecondsSinceEpoch(map["start"]), endTime: DateTime.fromMillisecondsSinceEpoch(map["end"]), subject: map["subject"], isAllDay: map["isAllDay"]);
+    startTime: DateTime.fromMillisecondsSinceEpoch(map["start"]),
+    endTime: DateTime.fromMillisecondsSinceEpoch(map["end"]),
+    subject: map["subject"],
+    isAllDay: map["isAllDay"]);
 
-Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getStundenplaene() async {
+Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenplaene() async {
   DOM.Document document = parse(await getStundenplanWebsite());
 
-  List<(String name, Uint8List data)> stundenplaene = List.empty(growable: true);
-  for (DOM.Element element in document.body?.querySelectorAll("a") ?? []) {
-    if (element.attributes["href"]?.isEmpty ?? true) throw Exception("No href in links");
-    stundenplaene.add((element.text, (await getSecuredPage(stundenplanUrl + element.attributes["href"]!)).bodyBytes));
-  }
+  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = await getStundenplanLinks(document, true);
 
-  //TODO
-  if (stundenplaene.length != 2) throw Exception("wrong amount of stundenplaene");
+  if (stundenplaene.length % 2 != 0) throw Exception("wrong amount of stundenplaene");
 
   try {
-    Uint8List klassenplan = stundenplaene.firstWhere((element) => element.$1.toLowerCase().contains("klasse")).$2;
-    Uint8List oberstufenplan = stundenplaene.firstWhere((element) => element.$1.toLowerCase().contains("oberstufe")).$2;
+    print(stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1)));
+    Uint8List klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+    Uint8List oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
 
     return (PdfDocument(inputBytes: klassenplan), PdfDocument(inputBytes: oberstufenplan));
   } catch (e) {
     throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
   }
+}
+
+Future<void> updateStundenplan() async {
+  DOM.Document document = parse(await getStundenplanWebsite());
+
+  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = await getStundenplanLinks(document, true);
+
+  if (stundenplaene.length % 2 != 0) throw Exception("wrong amount of stundenplaene");
+
+  try {
+    print(stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1)));
+    Uint8List klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+    Uint8List oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+
+    return;
+  } catch (e) {
+    throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
+  }
+}
+
+Future<List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)>> getStundenplanLinks(DOM.Document document, bool withData) async {
+  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = List.empty(growable: true);
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  final europeanDateFormatter = DateFormat('dd.MM.yyyy');
+
+  for (DOM.Element element in document.body?.querySelectorAll("a") ?? []) {
+    if (element.attributes["href"]?.isEmpty ?? true) throw Exception("No href in links");
+    String stundenplanUrlMaybeOverriden = prefs.getString("website_url_stundenplan") ?? stundenplanUrl;
+    if (stundenplanUrlMaybeOverriden.endsWith("/")) stundenplanUrlMaybeOverriden.substring(0, stundenplanUrlMaybeOverriden.length - 1);
+
+    String name = element.text;
+    Uint8List data = withData ? (await getSecuredPage(stundenplanUrlMaybeOverriden + "/" + element.attributes["href"]!)).bodyBytes : Uint8List(0);
+    int parseStart = name.indexOf("ab") + 2;
+    while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
+    DateTime starting = DateTime.parse(name.substring(parseStart, parseStart + 10));
+    print(starting);
+
+    parseStart = name.indexOf("Stand") + 5;
+    while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
+    DateTime updated = europeanDateFormatter.parse(name.substring(parseStart, parseStart + 10));
+    print(updated);
+
+    bool oberstufe = name.toLowerCase().contains("oberstufe");
+    if(!oberstufe && !name.toLowerCase().contains("klasse")) throw Exception("Stundenplan welcher weder als Klasse noch Oberstufe identifizierbar ist gefunden");
+    stundenplaene.add((starting, updated, oberstufe, data));
+  }
+  return stundenplaene;
 }
 
 Future<(List<String> klassen, List<String> oberstufen)> getStufen(PdfDocument klassenplan, PdfDocument oberstufenplan) async {
@@ -109,8 +159,7 @@ Future<(List<String> klassen, List<String> oberstufen)> getStufen(PdfDocument kl
   return (klassen.toSet().toList(), oberstufen.toSet().toList());
 }
 
-Future<List<Stunde>> getStundenPlan(String stufe) async {
-  var (PdfDocument klassenplan, PdfDocument oberstufenplan) = await getStundenplaene();
+Future<List<Stunde>> getStundenPlan(String stufe, PdfDocument klassenplan, PdfDocument oberstufenplan) async {
   var (klassen, oberstufen) = await getStufen(klassenplan, oberstufenplan);
 
   bool isKlasse = klassen.contains(stufe);
@@ -271,7 +320,8 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
   String tickertext = ticker.nextElementSibling?.text ?? "";
   ticker.remove();
 
-  List<Vertretung> vertretungen = [];
+  List<List<Vertretung>> vertretungen = [];
+  List<List<String>> betroffeneKlassenListen = List.empty(growable: true);
   for (DOM.Element h2 in plan.body!.querySelectorAll("h2")) {
     final europeanDateFormatter = DateFormat('dd.MM.yyyy');
     DateTime datum = europeanDateFormatter.parse(h2.text.substring(h2.text.lastIndexOf(" ") + 1));
@@ -284,6 +334,9 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
     if (betroffen.text.contains("keine"))
       continue;
     else if (!betroffen.text.startsWith("betroffen:")) throw Exception("betroffen text doesnt start with betroffen:");
+    List<String> betroffeneKlassen = betroffen.text.substring(10).split(",").map((e) => e.trim()).toList();
+    betroffeneKlassenListen.add(betroffeneKlassen);
+    vertretungen.add(List.empty(growable: true));
     DOM.Element? table = betroffen.nextElementSibling?.nextElementSibling;
     if (table == null || table.localName != "table") throw Exception("No table found");
     String stufe = "";
@@ -308,7 +361,7 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
         List<int> stundenList = stunden.length == 1
             ? [int.parse(stunden) - 1]
             : [for (int i = int.parse(stunden.substring(0, 1)); i <= int.parse(stunden.substring(4, 5)); i++) i - 1];
-        vertretungen.add(Vertretung()
+        vertretungen.last.add(Vertretung()
           ..klasse = stufe
           ..stunden = stundenList
           ..art = art
@@ -323,14 +376,43 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
       if (tds.length == 3) {
         if (tds[2].className != "eva auftrag") throw Exception("No eva found");
         String eva = tds[2].text;
-        vertretungen.last.eva = vertretungen.last.eva == null ? eva : "${vertretungen.last.eva!}\n$eva";
+        vertretungen.last.last.eva = vertretungen.last.last.eva == null ? eva : "${vertretungen.last.last.eva!}\n$eva";
+      }
+    }
+  }
+  int sortMethod = prefs.getInt("vertretungen_sort") ?? 0;
+  if (sortMethod != 1) {
+    for (final (int index, List<Vertretung> vertretungList) in vertretungen.indexed) {
+      if (sortMethod == 0) {
+        vertretungList.sort(
+          (a, b) {
+            return betroffeneKlassenListen[index].indexOf(a.klasse).compareTo(betroffeneKlassenListen[index].indexOf(b.klasse));
+          },
+        );
+      } else if (sortMethod == 2) {
+        vertretungList.sort((a, b) {
+          String klasseA = a.klasse;
+          String klasseB = b.klasse;
+
+          if (_startsWithDigit(klasseA) && _startsWithDigit(klasseB)) {
+            // If both strings start with a digit, compare them as integers.
+            int intA = int.parse(klasseA.split(RegExp(r'\D+')).first);
+            int intB = int.parse(klasseB.split(RegExp(r'\D+')).first);
+            return intA - intB;
+          } else {
+            // If at least one of the strings does not start with a digit, compare them lexicographically.
+            return klasseA.compareTo(klasseB);
+          }
+        });
       }
     }
   }
 
+  List<Vertretung> vertretungenFlattened = vertretungen.expand((element) => element).toList();
+
   prefs.setString("ticker", tickertext);
   List<Vertretung> alteVertretungen = isar.vertretungs.where().findAllSync();
-  List<Vertretung> neueVertretungen = vertretungen
+  List<Vertretung> neueVertretungen = vertretungenFlattened
       .where((vertretung) => !alteVertretungen.any((element) =>
           element.stunden == vertretung.stunden &&
           element.art == vertretung.art &&
@@ -345,7 +427,7 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
 
   await isar.writeTxn(() async {
     await isar.vertretungs.clear();
-    await isar.vertretungs.putAll(vertretungen);
+    await isar.vertretungs.putAll(vertretungenFlattened);
   });
 
   prefs.setInt("vertretungLastDownload", DateTime.now().millisecondsSinceEpoch);
@@ -353,8 +435,20 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
   return neueVertretungen;
 }
 
-Future<String> getStundenplanWebsite() async => (await getSecuredPage(stundenplanUrl)).body;
-Future<String> getVertretungsplanWebsite() async => (await getSecuredPage(vertretungsplanUrl)).body;
+bool _startsWithDigit(String s) {
+  return RegExp(r'^\d').hasMatch(s);
+}
+
+Future<String> getStundenplanWebsite() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  return (await getSecuredPage(prefs.getString("website_url_stundenplan") ?? stundenplanUrl)).body;
+}
+
+Future<String> getVertretungsplanWebsite() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  return (await getSecuredPage(prefs.getString("website_url_vertretungsplan") ?? vertretungsplanUrl)).body;
+}
+
 Future<bool> checkCredentials() async {
   await getVertretungsplanWebsite();
   return true;

@@ -9,19 +9,21 @@ import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:isar/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../database.dart';
-// import '../main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../connection.dart';
 import 'vertretungsplan.dart';
 
 enum SettingType {
-  bool,
+  bool, //default value false
+  boolDefaultTrue, //default value false
   selection,
   selectionWithConfirm,
   customTap,
   custom,
   flutterAbout,
+  text,
+  string
 }
 
 Map<String, Duration> durations = {
@@ -29,6 +31,7 @@ Map<String, Duration> durations = {
   "30 Minuten": const Duration(minutes: 30),
   "1 Stunde": const Duration(hours: 1),
   "2 Stunden": const Duration(hours: 2),
+  "4 Stunden": const Duration(hours: 2),
   "6 Stunden": const Duration(hours: 6),
   "12 Stunden": const Duration(hours: 12),
   "1 Tag": const Duration(days: 1),
@@ -184,14 +187,87 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final List<(String, String?, IconData, List<(String?, List<(String, String?, IconData, String, SettingType, dynamic)>)>)> settings = [
       (
-        "Dein Account",
-        "Login, Klassen- und Kursauswahl",
-        Ionicons.person,
+        "Verbindung und Aktualisierungen",
+        "Login, Benachrichtigungen, Hintergrundaktualisierung",
+        Ionicons.globe_outline,
         [
           (
-            "Login",
+            "Login", //TODO make new login settingstype
             [
               ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () => newLogin(context)),
+            ]
+          ),
+          (
+            "Hintergrundaktualisierung",
+            [
+              ("Vertretungsplan", "Aktualisiere den Vertretungsplan im Hintergrund", Ionicons.refresh_outline, "background", SettingType.boolDefaultTrue, null),
+              (
+                "Vertretungsplan Update Intervall",
+                "Der Vertretungsplan wird im Hintergrund nach diesem Intervall aktualisiert",
+                Ionicons.refresh_circle_outline,
+                "vertretungUpdateDuration",
+                SettingType.selection,
+                (durations.keys.toList(), 3),
+              ),
+              (
+                "Vertretungsplan Update Wifi Only",
+                "Aktualisiere Vertretungsplan nur bei WLAN Verbindung.",
+                Ionicons.wifi_outline,
+                "vertretungUpdateWifi",
+                SettingType.bool,
+                null,
+              ),
+            ]
+          ),
+          if (prefs.getBool("background") ?? true)
+            (
+              "Benachrichtigungen",
+              [
+                (
+                  "Zeige Benachrichtigungen",
+                  "Zeige Benachrichtigungen passend zu deinen Kursen",
+                  Ionicons.notifications,
+                  "showNotifications",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+              ]
+            ),
+          (
+            "Stundenplan und Termine Aktualisierung",
+            [
+              (
+                "Pius-Termine Update Intervall",
+                "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
+                Ionicons.refresh_circle_outline,
+                "termineUpdateDuration",
+                SettingType.selection,
+                (durations.keys.toList(), 8),
+              ),
+              (
+                "Termine Update Wifi Only",
+                "Aktualisiere Termine nur bei WLAN Verbindung.",
+                Ionicons.wifi_outline,
+                "termineUpdateWifi",
+                SettingType.boolDefaultTrue,
+                null,
+              ),
+              (
+                "Stundenplan Update Intervall",
+                "Der Stundenplan wird bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
+                Ionicons.refresh_circle_outline,
+                "stundenplanUpdateDuration",
+                SettingType.selection,
+                (durations.keys.toList(), 8),
+              ),
+              (
+                "Stundenplan Update Wifi Only",
+                "Aktualisiere Stundenplan nur bei WLAN Verbindung.",
+                Ionicons.wifi_outline,
+                "stundenplanUpdateWifi",
+                SettingType.boolDefaultTrue,
+                null,
+              ),
             ]
           ),
         ]
@@ -210,193 +286,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 Ionicons.color_palette,
                 "-",
                 SettingType.custom,
-                StatefulBuilder(
-                  builder: (context, setState) {
-                    return DynamicColorBuilder(
-                      builder: (lightDynamic, darkDynamic) {
-                        Color primaryColor = const Color.fromARGB(255, 87, 162, 211);
-                        Color secondaryColor = const Color.fromARGB(255, 30, 111, 147);
-                        Color tertiaryColor = const Color.fromARGB(255, 255, 204, 0);
-                        Color errorColor = const Color.fromARGB(255, 255, 0, 0);
-                        ColorScheme piusColorScheme = ColorScheme.fromSeed(
-                            seedColor: primaryColor, primary: primaryColor, secondary: secondaryColor, tertiary: tertiaryColor, error: errorColor);
-
-                        List<(ColorScheme, String, bool)> colorSchemes = [
-                          (piusColorScheme, "Pius", false),
-                          if (lightDynamic != null) (lightDynamic.harmonized(), "System", false),
-                          ...widget.isar.colorPalettes
-                              .where()
-                              .findAllSync()
-                              .map((e) => (e.toColorScheme(), (e.name == null || e.name!.isEmpty) ? "Unbenannt" : e.name!, e.fromSeed)),
-                        ];
-
-                        int selectedColorScheme = prefs.getInt("colorSchemeIndex") ?? (colorSchemes.length > 1 ? 1 : 0);
-
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: klassenVertretungsBlock(
-                                  [
-                                    Vertretung()
-                                      ..klasse = "ZZ"
-                                      ..stunden = [1, 2]
-                                      ..art = "EVA"
-                                      ..kurs = "Kurs"
-                                      ..raum = "A123"
-                                      ..lehrkraft = "Lehrkraft"
-                                      ..eva = "EVA"
-                                      ..hervorgehoben = [4],
-                                  ],
-                                  theme: Theme.of(context),
-                                ),
-                              ),
-                            ),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    for (var (index, (ColorScheme colorScheme, String name, bool fromSeed)) in colorSchemes.indexed)
-                                      Column(
-                                        children: [
-                                          GestureDetector(
-                                            onTap: () async {
-                                              await prefs.setInt("colorSchemeIndex", index);
-                                              if (context.mounted) ColorChangedNotification().dispatch(context);
-                                              setState(() {});
-                                            },
-                                            onLongPress: index >= (lightDynamic != null ? 2 : 1)
-                                                ? () async {
-                                                    showEditColorDialog(
-                                                      fromSeed,
-                                                      name,
-                                                      colorScheme.primary,
-                                                      colorScheme.secondary,
-                                                      colorScheme.tertiary,
-                                                      colorScheme.error,
-                                                      (fromSeed, name, primary, secondary, tertiary, error) async {
-                                                        await widget.isar.writeTxn(() async {
-                                                          await widget.isar.colorPalettes
-                                                              .put((await widget.isar.colorPalettes.where().findAll())[index - (lightDynamic != null ? 2 : 1)]
-                                                                ..fromSeed = fromSeed
-                                                                ..name = name
-                                                                ..primaryR = primary.red
-                                                                ..primaryG = primary.green
-                                                                ..primaryB = primary.blue
-                                                                ..secondaryR = secondary.red
-                                                                ..secondaryG = secondary.green
-                                                                ..secondaryB = secondary.blue
-                                                                ..tertiaryR = tertiary.red
-                                                                ..tertiaryG = tertiary.green
-                                                                ..tertiaryB = tertiary.blue
-                                                                ..errorR = error.red
-                                                                ..errorG = error.green
-                                                                ..errorB = error.blue);
-                                                        });
-                                                        await prefs.setInt("colorSchemeIndex", index);
-                                                        if (context.mounted) ColorChangedNotification().dispatch(context);
-                                                        setState(() {});
-                                                      },
-                                                      () async {
-                                                        await widget.isar.writeTxn(() async {
-                                                          await widget.isar.colorPalettes.delete(
-                                                              (await widget.isar.colorPalettes.where().findAll())[index - (lightDynamic != null ? 2 : 1)].id);
-                                                        });
-                                                        await prefs.setInt("colorSchemeIndex", 0);
-                                                        if (context.mounted) ColorChangedNotification().dispatch(context);
-                                                        setState(() {});
-                                                      },
-                                                    );
-                                                  }
-                                                : null,
-                                            child: AnimatedContainer(
-                                                height: 64,
-                                                width: 64,
-                                                duration: const Duration(milliseconds: 500),
-                                                curve: Curves.easeInOut,
-                                                margin: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  color: colorScheme.primaryContainer,
-                                                ),
-                                                padding: EdgeInsets.all(selectedColorScheme == index ? 2 : 0),
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  child: GridView.count(
-                                                    crossAxisCount: 2,
-                                                    children: [
-                                                      Container(color: colorScheme.primary),
-                                                      Container(color: colorScheme.secondary),
-                                                      Container(color: colorScheme.tertiary),
-                                                      Container(color: colorScheme.error),
-                                                    ],
-                                                  ),
-                                                )),
-                                          ),
-                                          Text(name, style: TextStyle(color: index == selectedColorScheme ? Theme.of(context).colorScheme.primary : null)),
-                                        ],
-                                      ),
-                                    GestureDetector(
-                                      onTap: () async {
-                                        showEditColorDialog(
-                                          true,
-                                          "",
-                                          Theme.of(context).colorScheme.primary,
-                                          Theme.of(context).colorScheme.secondary,
-                                          Theme.of(context).colorScheme.tertiary,
-                                          Theme.of(context).colorScheme.error,
-                                          (fromSeed, name, primary, secondary, tertiary, error) async {
-                                            await widget.isar.writeTxn(() async {
-                                              await widget.isar.colorPalettes.put(ColorPalette()
-                                                ..fromSeed = fromSeed
-                                                ..name = name
-                                                ..primaryR = primary.red
-                                                ..primaryG = primary.green
-                                                ..primaryB = primary.blue
-                                                ..secondaryR = secondary.red
-                                                ..secondaryG = secondary.green
-                                                ..secondaryB = secondary.blue
-                                                ..tertiaryR = tertiary.red
-                                                ..tertiaryG = tertiary.green
-                                                ..tertiaryB = tertiary.blue
-                                                ..errorR = error.red
-                                                ..errorG = error.green
-                                                ..errorB = error.blue);
-                                            });
-                                            await prefs.setInt("colorSchemeIndex", colorSchemes.length);
-                                            if (context.mounted) ColorChangedNotification().dispatch(context);
-                                            setState(() {});
-                                          },
-                                        );
-                                      },
-                                      child: Container(
-                                          height: 64,
-                                          width: 64,
-                                          margin: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(4),
-                                            color: Theme.of(context).colorScheme.surfaceVariant,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: const Icon(Ionicons.add)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
+                ColorPaletteSelectionTile(
+                  isar: widget.isar,
+                  prefs: prefs,
                 )
               ),
               (
@@ -405,14 +297,26 @@ class _SettingsPageState extends State<SettingsPage> {
                 Ionicons.moon_outline,
                 "darkMode",
                 SettingType.selectionWithConfirm,
-                (["System", "Light", "Dark"], () => ColorChangedNotification().dispatch(context))
+                (["System", "Light", "Dark"], 0, () => ColorChangedNotification().dispatch(context))
               ),
+            ]
+          ),
+        ]
+      ),
+      (
+        "Stundenplan",
+        "Anpassungen der Stundenplan Ansicht",
+        Ionicons.calendar_outline,
+        [
+          (
+            "Inhalt",
+            [
               (
-                "Nutze Abkürzungen",
-                "Kürze die Überschriften innerhalb des Vertretungsplans ab",
-                Ionicons.sparkles_outline,
-                "abbreviations",
-                SettingType.bool,
+                "Zeige Pius-Termine",
+                "Zeige die Termine des offiziellen Pius Kalendars im Stundenplan",
+                Ionicons.newspaper_outline,
+                "showTermine",
+                SettingType.boolDefaultTrue,
                 null
               ),
             ]
@@ -420,50 +324,64 @@ class _SettingsPageState extends State<SettingsPage> {
         ]
       ),
       (
-        "Benachrichtigungen und Aktualisierungen",
-        "Zeiten, Hintergrundaktualisierung, WLAN only",
-        Ionicons.notifications,
+        "Vertretungsplan",
+        "Anpassungen der Vertretungsplan Ansicht",
+        Ionicons.reorder_four,
         [
           (
-            "Benachrichtigungen",
+            "Inhalt",
             [
-              ("Zeige Benachrichtigungen", "...", Ionicons.notifications, "showNotifications", SettingType.bool, null),
+              (
+                "Nutze Abkürzungen",
+                "Kürze die Überschriften innerhalb des Vertretungsplans ab",
+                Ionicons.sparkles_outline,
+                "abbreviations",
+                SettingType.boolDefaultTrue,
+                null
+              ),
+              (
+                "Sortiere Vertretungen nach Klasse",
+                "Wähle aus nach welchem System die Reihenfolge der Vertretungen auf dem Vertretungsplan entschieden wird.",
+                Ionicons.shuffle_outline,
+                "vertretungen_sort",
+                SettingType.selection,
+                (["betroffen-Feld der Website", "Reihenfolge der Website", "Alphabetisch"], 0)
+              ),
             ]
           ),
+        ]
+      ),
+      (
+        "Erweiterte Einstellungen",
+        "Diese Einstellungen sollten in den meisten Fällen nicht geändert werden müssen",
+        Ionicons.code_working_outline,
+        [
           (
-            "Stundenplan und Termine Aktualisierung",
+            "Website URLs",
             [
               (
-                "Pius-Termine Update Intervall",
-                "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
-                Ionicons.refresh_circle_outline,
-                "termineUpdateDuration",
-                SettingType.selection,
-                durations.keys.toList(),
+                "Stundenplan Website",
+                "Die URL der Stundenpläne",
+                Ionicons.globe_outline,
+                "website_url_stundenplan",
+                SettingType.string,
+                "https://www.pius-gymnasium.de/stundenplaene"
               ),
               (
-                "Termine Update Wifi Only",
-                "Aktualisiere Termine nur bei WLAN Verbindung.",
-                Ionicons.wifi_outline,
-                "termineUpdateWifi",
-                SettingType.bool,
-                null,
+                "Vertretungsplan Website",
+                "Die URL des Vertretungsplans",
+                Ionicons.globe_outline,
+                "website_url_vertretungsplan",
+                SettingType.string,
+                "https://www.pius-gymnasium.de/vertretungsplan"
               ),
               (
-                "Stundenplan Update Intervall",
-                "Der Stundenplan wird bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
-                Ionicons.refresh_circle_outline,
-                "stundenplanUpdateDuration",
-                SettingType.selection,
-                durations.keys.toList(),
-              ),
-              (
-                "Stundenplan Update Wifi Only",
-                "Aktualisiere Stundenplan nur bei WLAN Verbindung.",
-                Ionicons.wifi_outline,
-                "stundenplanUpdateWifi",
-                SettingType.bool,
-                null,
+                "Pius Termine Website",
+                "Die URL des ICS Kalenders der Pius Termine",
+                Ionicons.globe_outline,
+                "website_url_termine",
+                SettingType.string,
+                "https://www.pius-gymnasium.de/pius-kalender.ics"
               ),
             ]
           ),
@@ -505,141 +423,199 @@ class _SettingsPageState extends State<SettingsPage> {
               leading: Icon(icon),
               title: Text(title, style: Theme.of(context).textTheme.titleLarge),
               subtitle: subtitle != null ? Text(subtitle) : null,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) {
-                return Scaffold(
-                  appBar: AppBar(
-                    title: Text(title),
-                    // backgroundColor: Theme.of(context).colorScheme.background,
-                    // leading: IconButton(
-                    //   icon: const Icon(Ionicons.arrow_back),
-                    //   onPressed: () => Navigator.of(context).pop(),
-                    // ),
-                  ),
-                  body: ListView(
-                    padding: const EdgeInsets.only(bottom: 128, top: 16),
-                    children: [
-                      for (final (title, settings) in sections)
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (title != null && title.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 16),
-                                child: Text(
-                                  title,
-                                  style: titleStyle,
-                                ),
-                              ),
-                            for (final (title, subtitle, icon, setting, type, extra) in settings)
-                              StatefulBuilder(
-                                builder: (context, setState) {
-                                  switch (type) {
-                                    case SettingType.bool:
-                                      return SwitchListTile(
-                                        title: Text(title),
-                                        subtitle: subtitle != null ? Text(subtitle) : null,
-                                        secondary: Icon(icon),
-                                        value: prefs.getBool(setting) ?? false,
-                                        onChanged: (value) {
-                                          prefs.setBool(setting, value);
-                                          setState(() {});
-                                        },
-                                      );
-                                    case SettingType.selectionWithConfirm:
-                                    case SettingType.selection:
-                                      List<String> options =
-                                          List<String>.from((type == SettingType.selectionWithConfirm) ? (extra as (List<String>, VoidCallback)).$1 : extra);
-                                      return ListTile(
-                                          title: Text(title),
-                                          subtitle: Text(options[prefs.getInt(setting) ?? 0]),
-                                          leading: Icon(icon),
-                                          onTap: () => showDialog(
-                                              context: context,
-                                              builder: (context) {
-                                                int index = prefs.getInt(setting) ?? 0;
-                                                return StatefulBuilder(
-                                                    builder: (context, setState) => AlertDialog(
-                                                          icon: Icon(icon),
-                                                          title: Text(title),
-                                                          content: Column(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Text(subtitle ?? ""),
-                                                              const SizedBox(height: 16),
-                                                              for (final option in options)
-                                                                RadioListTile(
-                                                                  title: Text(option),
-                                                                  value: option,
-                                                                  groupValue: options[index],
-                                                                  onChanged: (value) {
-                                                                    index = options.indexOf(value ?? options[0]);
-                                                                    setState(() {});
-                                                                  },
-                                                                )
-                                                            ],
-                                                          ),
-                                                          actions: [
-                                                            TextButton(
-                                                                style: TextButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primaryContainer),
-                                                                onPressed: () {
-                                                                  Navigator.of(context).pop();
-                                                                  prefs.setInt(setting, index);
-                                                                  if (type == SettingType.selectionWithConfirm) {
-                                                                    (extra as (List<String>, VoidCallback)).$2();
-                                                                  }
-                                                                },
-                                                                child: const Text("Bestätigen")),
-                                                            TextButton(
-                                                                onPressed: () {
-                                                                  Navigator.of(context).pop();
-                                                                },
-                                                                child: const Text("Abbrechen"))
-                                                          ],
-                                                        ));
-                                              }).then((value) => setState(() {})));
-                                    case SettingType.customTap:
-                                      return ListTile(
-                                        title: Text(title),
-                                        subtitle: subtitle != null ? Text(subtitle) : null,
-                                        leading: Icon(icon),
-                                        onTap: () => extra(),
-                                      );
-                                    case SettingType.custom:
-                                      return extra;
-                                    case SettingType.flutterAbout:
-                                      return ListTile(
-                                        title: Text(title),
-                                        subtitle: subtitle != null ? Text(subtitle) : null,
-                                        leading: Icon(icon),
-                                        onTap: () async {
-                                          PackageInfo packageInfo = await PackageInfo.fromPlatform();
-                                          if (context.mounted) {
-                                            showAboutDialog(
-                                              context: context,
-                                              applicationIcon: Image.asset("assets/icon/icon_transparent.png", height: 64, width: 64),
-                                              applicationName: packageInfo.appName,
-                                              applicationVersion: packageInfo.version,
-                                              applicationLegalese: extra,
-                                            );
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => StatefulBuilder(
+                        builder: (context, setState) => Scaffold(
+                          //TODO is StatefulBuilder needed?
+                          appBar: AppBar(
+                            title: Text(title),
+                            // backgroundColor: Theme.of(context).colorScheme.background,
+                            // leading: IconButton(
+                            //   icon: const Icon(Ionicons.arrow_back),
+                            //   onPressed: () => Navigator.of(context).pop(),
+                            // ),
+                          ),
+                          body: ListView(
+                            padding: const EdgeInsets.only(bottom: 128, top: 16),
+                            children: [
+                              for (final (title, settings) in sections)
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (title != null && title.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16),
+                                        child: Text(
+                                          title,
+                                          style: titleStyle,
+                                        ),
+                                      ),
+                                    for (final (title, subtitle, icon, setting, type, extra) in settings)
+                                      Builder(
+                                        builder: (context) {
+                                          switch (type) {
+                                            case SettingType.text:
+                                              return ListTile(
+                                                title: Text(title),
+                                                subtitle: subtitle != null ? Text(subtitle) : null,
+                                                leading: Icon(icon),
+                                              );
+                                            case SettingType.string:
+                                              return ListTile(
+                                                  title: Text(title),
+                                                  subtitle: Text(prefs.getString(setting) ?? extra),
+                                                  leading: Icon(icon),
+                                                  onTap: () => showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        TextEditingController controller = TextEditingController(text: prefs.getString(setting) ?? extra);
+                                                        return StatefulBuilder(
+                                                            builder: (context, setState) => AlertDialog(
+                                                                  icon: Icon(icon),
+                                                                  title: Text(title),
+                                                                  content: TextField(
+                                                                    controller: controller,
+                                                                  ),
+                                                                  actions: [
+                                                                    TextButton(
+                                                                        style: TextButton.styleFrom(
+                                                                            backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                          prefs.setString(setting, controller.text);
+                                                                        },
+                                                                        child: const Text("Bestätigen")),
+                                                                    TextButton(
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                        child: const Text("Abbrechen"))
+                                                                  ],
+                                                                ));
+                                                      }).then((value) => setState(() {})));
+                                            case SettingType.boolDefaultTrue:
+                                            case SettingType.bool:
+                                              return SwitchListTile(
+                                                title: Text(title),
+                                                subtitle: subtitle != null ? Text(subtitle) : null,
+                                                secondary: Icon(icon),
+                                                value: prefs.getBool(setting) ?? (type == SettingType.boolDefaultTrue),
+                                                onChanged: (value) {
+                                                  prefs.setBool(setting, value);
+                                                  setState(() {});
+                                                },
+                                              );
+                                            case SettingType.selectionWithConfirm:
+                                            case SettingType.selection:
+                                              List<String> options = List<String>.from(extra.$1);
+                                              int fallbackIndex = extra.$2;
+                                              //(type == SettingType.selectionWithConfirm) ? (extra as (List<String>, VoidCallback)).$1 : extra);
+                                              return ListTile(
+                                                  title: Text(title),
+                                                  subtitle: Text(options[prefs.getInt(setting) ?? fallbackIndex]),
+                                                  leading: Icon(icon),
+                                                  onTap: () => showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        int index = prefs.getInt(setting) ?? fallbackIndex;
+                                                        return StatefulBuilder(
+                                                            builder: (context, setState) => AlertDialog(
+                                                                  icon: Icon(icon),
+                                                                  title: Text(title),
+                                                                  content: SingleChildScrollView(
+                                                                    child: Column(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      children: [
+                                                                        Text(subtitle ?? ""),
+                                                                        const SizedBox(height: 16),
+                                                                        for (final option in options)
+                                                                          RadioListTile(
+                                                                            title: Text(option),
+                                                                            value: option,
+                                                                            groupValue: options[index],
+                                                                            onChanged: (value) {
+                                                                              index = options.indexOf(value ?? options[0]);
+                                                                              setState(() {});
+                                                                            },
+                                                                          )
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                  actions: [
+                                                                    TextButton(
+                                                                        style: TextButton.styleFrom(
+                                                                            backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                          prefs.setInt(setting, index);
+                                                                          if (type == SettingType.selectionWithConfirm) {
+                                                                            extra.$3();
+                                                                          }
+                                                                        },
+                                                                        child: const Text("Bestätigen")),
+                                                                    TextButton(
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                        child: const Text("Abbrechen"))
+                                                                  ],
+                                                                ));
+                                                      }).then((value) => setState(() {})));
+                                            case SettingType.customTap:
+                                              return ListTile(
+                                                title: Text(title),
+                                                subtitle: subtitle != null ? Text(subtitle) : null,
+                                                leading: Icon(icon),
+                                                onTap: () => extra(),
+                                              );
+                                            case SettingType.custom:
+                                              return extra;
+                                            case SettingType.flutterAbout:
+                                              return ListTile(
+                                                title: Text(title),
+                                                subtitle: subtitle != null ? Text(subtitle) : null,
+                                                leading: Icon(icon),
+                                                onTap: () async {
+                                                  PackageInfo packageInfo = await PackageInfo.fromPlatform();
+                                                  if (context.mounted) {
+                                                    showAboutDialog(
+                                                      context: context,
+                                                      applicationIcon: Image.asset("assets/icon/icon_transparent.png", height: 64, width: 64),
+                                                      applicationName: packageInfo.appName,
+                                                      applicationVersion: packageInfo.version,
+                                                      applicationLegalese: extra,
+                                                    );
+                                                  }
+                                                },
+                                              );
                                           }
                                         },
-                                      );
-                                  }
-                                },
-                              )
-                          ],
-                        )
-                    ],
-                  ),
-                );
-              })),
+                                      )
+                                  ],
+                                )
+                            ],
+                          ),
+                        ),
+                      ))),
             )
         ],
       ),
     );
   }
+}
 
+class ColorPaletteSelectionTile extends StatefulWidget {
+  const ColorPaletteSelectionTile({super.key, required this.isar, required this.prefs});
+
+  final Isar isar;
+  final SharedPreferences prefs;
+
+  @override
+  State<ColorPaletteSelectionTile> createState() => _ColorPaletteSelectionTileState();
+}
+
+class _ColorPaletteSelectionTileState extends State<ColorPaletteSelectionTile> {
   void showEditColorDialog(
       bool fromSeed, String name, Color primary, Color secondary, Color tertiary, Color error, Function(bool, String, Color, Color, Color, Color) onConfirm,
       [VoidCallback? onDelete]) {
@@ -809,6 +785,194 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        Color primaryColor = const Color.fromARGB(255, 87, 162, 211);
+        Color secondaryColor = const Color.fromARGB(255, 30, 111, 147);
+        Color tertiaryColor = const Color.fromARGB(255, 255, 204, 0);
+        Color errorColor = const Color.fromARGB(255, 255, 0, 0);
+        ColorScheme piusColorScheme =
+            ColorScheme.fromSeed(seedColor: primaryColor, primary: primaryColor, secondary: secondaryColor, tertiary: tertiaryColor, error: errorColor);
+
+        List<(ColorScheme, String, bool)> colorSchemes = [
+          (piusColorScheme, "Pius", false),
+          if (lightDynamic != null) (lightDynamic.harmonized(), "System", false),
+          ...widget.isar.colorPalettes
+              .where()
+              .findAllSync()
+              .map((e) => (e.toColorScheme(), (e.name == null || e.name!.isEmpty) ? "Unbenannt" : e.name!, e.fromSeed)),
+        ];
+
+        int selectedColorScheme = widget.prefs.getInt("colorSchemeIndex") ?? (colorSchemes.length > 1 ? 1 : 0);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: klassenVertretungsBlock(
+                  [
+                    Vertretung()
+                      ..klasse = "ZZ"
+                      ..stunden = [1, 2]
+                      ..art = "EVA"
+                      ..kurs = "Kurs"
+                      ..raum = "A123"
+                      ..lehrkraft = "Lehrkraft"
+                      ..eva = "EVA"
+                      ..hervorgehoben = [4],
+                  ],
+                  theme: Theme.of(context),
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var (index, (ColorScheme colorScheme, String name, bool fromSeed)) in colorSchemes.indexed)
+                      Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              await widget.prefs.setInt("colorSchemeIndex", index);
+                              if (context.mounted) ColorChangedNotification().dispatch(context);
+                              setState(() {});
+                            },
+                            onLongPress: index >= (lightDynamic != null ? 2 : 1)
+                                ? () async {
+                                    showEditColorDialog(
+                                      fromSeed,
+                                      name,
+                                      colorScheme.primary,
+                                      colorScheme.secondary,
+                                      colorScheme.tertiary,
+                                      colorScheme.error,
+                                      (fromSeed, name, primary, secondary, tertiary, error) async {
+                                        await widget.isar.writeTxn(() async {
+                                          await widget.isar.colorPalettes
+                                              .put((await widget.isar.colorPalettes.where().findAll())[index - (lightDynamic != null ? 2 : 1)]
+                                                ..fromSeed = fromSeed
+                                                ..name = name
+                                                ..primaryR = primary.red
+                                                ..primaryG = primary.green
+                                                ..primaryB = primary.blue
+                                                ..secondaryR = secondary.red
+                                                ..secondaryG = secondary.green
+                                                ..secondaryB = secondary.blue
+                                                ..tertiaryR = tertiary.red
+                                                ..tertiaryG = tertiary.green
+                                                ..tertiaryB = tertiary.blue
+                                                ..errorR = error.red
+                                                ..errorG = error.green
+                                                ..errorB = error.blue);
+                                        });
+                                        await widget.prefs.setInt("colorSchemeIndex", index);
+                                        if (context.mounted) ColorChangedNotification().dispatch(context);
+                                        setState(() {});
+                                      },
+                                      () async {
+                                        await widget.isar.writeTxn(() async {
+                                          await widget.isar.colorPalettes
+                                              .delete((await widget.isar.colorPalettes.where().findAll())[index - (lightDynamic != null ? 2 : 1)].id);
+                                        });
+                                        await widget.prefs.setInt("colorSchemeIndex", 0);
+                                        if (context.mounted) ColorChangedNotification().dispatch(context);
+                                        setState(() {});
+                                      },
+                                    );
+                                  }
+                                : null,
+                            child: AnimatedContainer(
+                                height: 64,
+                                width: 64,
+                                duration: const Duration(milliseconds: 500),
+                                curve: Curves.easeInOut,
+                                margin: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: colorScheme.primaryContainer,
+                                ),
+                                padding: EdgeInsets.all(selectedColorScheme == index ? 2 : 0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: GridView.count(
+                                    crossAxisCount: 2,
+                                    children: [
+                                      Container(color: colorScheme.primary),
+                                      Container(color: colorScheme.secondary),
+                                      Container(color: colorScheme.tertiary),
+                                      Container(color: colorScheme.error),
+                                    ],
+                                  ),
+                                )),
+                          ),
+                          Text(name, style: TextStyle(color: index == selectedColorScheme ? Theme.of(context).colorScheme.primary : null)),
+                        ],
+                      ),
+                    GestureDetector(
+                      onTap: () async {
+                        showEditColorDialog(
+                          true,
+                          "",
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                          Theme.of(context).colorScheme.tertiary,
+                          Theme.of(context).colorScheme.error,
+                          (fromSeed, name, primary, secondary, tertiary, error) async {
+                            await widget.isar.writeTxn(() async {
+                              await widget.isar.colorPalettes.put(ColorPalette()
+                                ..fromSeed = fromSeed
+                                ..name = name
+                                ..primaryR = primary.red
+                                ..primaryG = primary.green
+                                ..primaryB = primary.blue
+                                ..secondaryR = secondary.red
+                                ..secondaryG = secondary.green
+                                ..secondaryB = secondary.blue
+                                ..tertiaryR = tertiary.red
+                                ..tertiaryG = tertiary.green
+                                ..tertiaryB = tertiary.blue
+                                ..errorR = error.red
+                                ..errorG = error.green
+                                ..errorB = error.blue);
+                            });
+                            await widget.prefs.setInt("colorSchemeIndex", colorSchemes.length);
+                            if (context.mounted) ColorChangedNotification().dispatch(context);
+                            setState(() {});
+                          },
+                        );
+                      },
+                      child: Container(
+                          height: 64,
+                          width: 64,
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: Theme.of(context).colorScheme.surfaceVariant,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Ionicons.add)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
