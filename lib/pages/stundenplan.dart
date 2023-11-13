@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:PiusApp/pages/settings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -32,13 +33,21 @@ class StundenplanPage extends StatefulWidget {
 }
 
 class _StundenplanPageState extends State<StundenplanPage> {
-  void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe) {
-    widget.isar.writeTxnSync(() {
-      widget.isar.stundes.clearSync(); //TODO nur alle löschen die nicht vor aktuellem zeitraum enden
-      widget.isar.stundes.putAllSync(stunden);
+  void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe) async {
+    await widget.isar.writeTxn(() async {
+      await widget.isar.stundes.clear();
+      await widget.isar.stundes.putAll(stunden);
     });
-    prefs.setString("stundenplanStufe", stufe);
-    prefs.setBool("stundenplanIsOberstufe", isOberstufe);
+    await prefs.setString("stundenplanStufe", stufe);
+    await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
+    setState(() {});
+    try {
+      await updateStundenplan(widget.isar);
+      widget.calendarLoading.value = false;
+      print("updated stundenplan");
+    } catch (e) {
+      if (kDebugMode) print(e);
+    }
     setState(() {});
   }
 
@@ -97,12 +106,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
                   }),
                   child: Container(
                     decoration: BoxDecoration(
-                        border: active
-                            ? null
-                            : Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                        color: active ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                        ),
+                        color: active ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface,
                         borderRadius: const BorderRadius.all(Radius.circular(4))),
                     width: calendarAppointmentDetails.bounds.width,
                     height: calendarAppointmentDetails.bounds.height,
@@ -170,27 +177,30 @@ class _StundenplanPageState extends State<StundenplanPage> {
               content: StatefulBuilder(
                 builder: (context, setState) {
                   if (stufen.isEmpty) {
-                    try {
-                      getCurrentStundenplaene().then((value) async {
-                        klassenplan = value.$1;
-                        oberstufenplan = value.$2;
-                        await getStufen(value.$1, value.$2).then((value) =>
-                            setState(() {
-                              klassen = value.$1;
-                              oberstufen = value.$2;
-                              stufen.addAll(klassen);
-                              stufen.addAll(oberstufen);
-                            }));
-                      });
-                    } catch (e) {
-                      if (kDebugMode) {
-                        print(e);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                        ));
+                    (() async {
+                      try {
+                        final (_klassenplan, _oberstufenplan) = await getCurrentStundenplaene();
+                        klassenplan = _klassenplan;
+                        oberstufenplan = _oberstufenplan;
+
+                        klassen = await compute(getStufen, klassenplan);
+                        oberstufen = await compute(getStufen, oberstufenplan);
+                        if (context.mounted) {
+                          setState(() {
+                            stufen.addAll(klassen);
+                            stufen.addAll(oberstufen);
+                          });
+                        }
+                      } catch (e) {
+                        if (kDebugMode) {
+                          print(e);
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text("Konnte Stundenpläne nicht abrufen: $e"),
+                          ));
+                        }
                       }
-                    }
+                    }).call();
                     return const Padding(
                       padding: EdgeInsets.all(8.0),
                       child: CupertinoActivityIndicator(),
@@ -210,13 +220,16 @@ class _StundenplanPageState extends State<StundenplanPage> {
                           title: Text(stufen[i]),
                           onTap: () async {
                             if (i < klassen.length) {
+                              setState(() {
+                                loading = true;
+                              });
+                              setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false);
                               Navigator.pop(context);
-                              setStundenplan(await getStundenPlan(klassen[i], klassenplan, oberstufenplan), klassen[i], false);
                             } else {
                               setState(() {
                                 loading = true;
                               });
-                              List<Stunde> stunden = await getStundenPlan(oberstufen[i - klassen.length], klassenplan, oberstufenplan);
+                              List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
                               if (context.mounted) Navigator.pop(context);
                               showStundenplanSelection(stunden, oberstufen[i - klassen.length]);
                             }
@@ -273,8 +286,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
                 width: double.infinity,
                 color: Theme.of(context).colorScheme.errorContainer,
                 alignment: Alignment.center,
-                child: Text(
-                    "Konnte ${[if (vertretungLoading == null) "Vertretungsplan", if (calendarLoading == null) "Kalender"].join(" und ")} nicht aktualisieren"),
+                child: Text("Konnte ${[
+                  if (vertretungLoading == null) "Vertretungsplan",
+                  if (calendarLoading == null) "Stundenplan"
+                ].join(" und ")} nicht aktualisieren"),
               ),
             Expanded(
               child: SfCalendar(
@@ -498,34 +513,95 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
       .map((e) => appointmentFromMap(Map<String, dynamic>.from(e))..notes = "termin")
       .toList();
 
-  List<DateTime> schulfreieTage = piusTermine
-      .where((element) => element.subject.toLowerCase().contains("unterrichtsfrei") || element.subject.toLowerCase().contains("ferien"))
-      .map((e) {
-        return [for (DateTime i = e.startTime; i.isBefore(e.endTime); i = i.add(const Duration(days: 1))) i];
-      })
-      .expand((element) => element)
+  List<Appointment> feiertagTermine = List<dynamic>.from(jsonDecode(prefs.getString("feiertagTermine") ?? "[]"))
+      .map((e) => appointmentFromMap(Map<String, dynamic>.from(e))..notes = "termin")
       .toList();
+
+  piusTermine.removeWhere((element) =>
+      feiertagTermine.any((feiertag) => feiertag.subject == element.subject && feiertag.startTime == element.startTime && feiertag.endTime == element.endTime));
+
+  List<(DateTime, DateTime)> schulfreieZeiten = List.empty(growable: true);
+
+  if (prefs.getBool("termineFrei") ?? true) {
+    schulfreieZeiten.addAll(piusTermine.map((e) {
+      List<int?> selectionIndices = ["für die jgst.", "für die jahrgangsstufe", "für die klasse"]
+          .map((s) => e.subject.toLowerCase().contains(s) ? e.subject.toLowerCase().indexOf(s) + s.length : null)
+          .toList();
+      for (int sI in selectionIndices.nonNulls) {
+        String substring = e.subject.substring(sI);
+        String? stufe = substring.trim().split(" ").firstOrNull;
+        //sort out alle nicht betroffenen stufen
+        if (stufe != null && stufe.toLowerCase() != prefs.getString("stundenplanStufe")?.toLowerCase()) return null;
+      }
+
+      if (e.subject.toLowerCase().contains("ferien")) return (e.startTime, e.endTime);
+      if (e.subject.toLowerCase().contains("unterrichtsfrei")) return (e.startTime, e.endTime);
+
+      List<int?> endIndices = ["unterricht schließt um", "unterrichtsende um"]
+          .map((s) => e.subject.toLowerCase().contains(s) ? e.subject.toLowerCase().indexOf(s) + s.length + 1 : null)
+          .toList();
+      for (int eI in endIndices.nonNulls) {
+        String uhrzeit = e.subject.substring(eI, eI + 5).trim();
+        int hour = int.tryParse(uhrzeit.split(":").first) ?? 0;
+        int minute = int.tryParse(uhrzeit.split(":").last) ?? 0;
+        return (e.startTime.copyWith(hour: hour, minute: minute), e.endTime.copyWith(hour: 23));
+      }
+
+      final keinUnterrichtRegex = RegExp(r'findet(?:.*?)? kein Unterricht statt');
+      if (keinUnterrichtRegex.hasMatch(e.subject)) {
+        return (e.startTime, e.endTime);
+      }
+
+      final stdKeinUnterrichtRegex = RegExp(r'(\d+)\.?\s?(?:\/?-?\\?\s?(\d+)\s*)?\. ?Std.? kein Unterricht');
+      final match = stdKeinUnterrichtRegex.firstMatch(e.subject);
+      try {
+        if (match != null) {
+          final start = int.parse(match.group(1) ?? "");
+          final end = match.group(2) != null ? int.parse(match.group(2) ?? "") : start;
+          (int, int) startZeit = stundenZeiten[start - 1];
+          (int, int) endZeit = stundenZeiten[end - 1];
+          return (
+            e.startTime.copyWith(hour: startZeit.$1, minute: startZeit.$2),
+            e.startTime.copyWith(hour: endZeit.$1, minute: endZeit.$2).add(const Duration(minutes: 45))
+          );
+        }
+      } catch (e) {
+        //if error then Std couldnt be matched apparently
+        if (kDebugMode) {
+          print(e);
+        }
+      }
+
+      //TODO Fettdonnerstag: Unterricht sowie Klassenarbeiten und Klausuren bis 11:20 Uhr (5-Q1) bzw. 12:30 Uhr (Q2)
+
+      return null;
+    }).nonNulls);
+  }
+
+  if (prefs.getBool("feiertageFrei") ?? true) schulfreieZeiten.addAll(feiertagTermine.map((e) => (e.startTime, e.endTime)));
+
+  List<Appointment> toShowTermine = List.empty(growable: true);
+  if (prefs.getBool("showTermine") ?? true) toShowTermine.addAll(piusTermine);
+  if (prefs.getBool("showFeiertage") ?? true) toShowTermine.addAll(feiertagTermine);
 
   return _getCalendarDataSourceFromStunden(
       stunden: stunden..addAll(vertretungsStunden),
       vertretungen: vertretungen,
       isOberstufe: isOberstufe,
-      schulfreieTage: schulfreieTage,
-      termine: (prefs.getBool("showTermine") ?? true) ? piusTermine : List.empty());
+      schulfreieZeiten: schulfreieZeiten,
+      termine: toShowTermine);
 }
 
 _AppointmentDataSource _getCalendarDataSourceFromStunden(
     {required List<Stunde> stunden,
-    List<DateTime> schulfreieTage = const <DateTime>[],
+    List<(DateTime, DateTime)> schulfreieZeiten = const <(DateTime, DateTime)>[],
     List<Appointment> termine = const <Appointment>[],
     List<Vertretung> vertretungen = const <Vertretung>[],
     bool isOberstufe = false,
     bool realTime = true}) {
   List<Appointment> appointments = <Appointment>[];
 
-  List<(int stunde, int minute)> uhrzeiten = realTime
-      ? [(7, 55), (8, 40), (9, 45), (10, 35), (11, 25), (12, 40), (13, 25), (14, 30), (15, 15), (16, 00), (16, 45)]
-      : [for (int i = 0; i < 11; i++) (i, 30)]; //TODO settings
+  List<(int stunde, int minute)> uhrzeiten = realTime ? stundenZeiten : [for (int i = 0; i < 11; i++) (i, 30)];
 
   DateTime alternativeEndDate = DateTime.now().add(Duration(days: DateTime.now().month <= 7 ? 0 : 365)).copyWith(month: 7, day: 31);
   Appointment? sommerferien = termine.where((element) => element.subject.contains("Sommerferien")).firstOrNull;
@@ -534,49 +610,65 @@ _AppointmentDataSource _getCalendarDataSourceFromStunden(
   for (Stunde stunde in stunden) {
     final (int uStunde, int uMinute) = uhrzeiten[stunde.stunden.first];
     final (int eStunde, int eMinute) = uhrzeiten[stunde.stunden.last];
+
     DateTime firstTime = getNextDateTimeWithWeekdayAndHour(stunde.gueltigAb, stunde.tag, uStunde, uMinute);
     // print(weekNumber(firstTime));
     if ((weekNumber(firstTime) % 2 == 0) != stunde.geradeWoche) {
       firstTime = firstTime.add(const Duration(days: 7));
     }
     final DateTime endTime = firstTime.copyWith(hour: eStunde, minute: eMinute).add(Duration(minutes: realTime ? 45 : 60));
+    final DateTime endDate = stunde.gueltigBis ?? alternativeEndDate;
 
-    // print("$firstTime : $endTime");
-    // print(firstTime.day);
     bool isVertretung = stunde.vertretung.value != null;
     List<DateTime> vertreteneTage = List.empty(growable: true);
     if (!isVertretung) {
       List<String> split = stunde.name.split(" ");
+      Map<DateTime, List<int>> vertreteneStunden = {};
       for (Vertretung vertretung in vertretungen) {
         if (vertretung.tag.weekday == stunde.tag &&
-            vertretung.stunden.contains(stunde.stunden.first) &&
             (vertretung.kurs.split("→").length >= 2 ? vertretung.kurs.split("→")[0].trim() : vertretung.kurs) ==
                 (isOberstufe ? "${split[0]} ${split[1]}" : split[0])) {
-          vertreteneTage.add(vertretung.tag);
+          if (vertreteneStunden[vertretung.tag] == null) vertreteneStunden[vertretung.tag] = List.empty(growable: true);
+          vertreteneStunden[vertretung.tag]!.addAll(vertretung.stunden);
+        }
+      }
+      for (DateTime tag in vertreteneStunden.keys) {
+        List<int> stunden = vertreteneStunden[tag]!;
+        if (stunde.stunden.every((element) => stunden.contains(element))) {
+          vertreteneTage.add(tag);
         }
       }
     }
 
-    appointments.add(Appointment(
-        startTime: firstTime,
-        endTime: endTime,
-        subject: stunde.name,
-        recurrenceExceptionDates: isVertretung ? null : vertreteneTage
-          ?..addAll(schulfreieTage),
-        notes: stunde.vertretung.value?.toJSON(),
-        recurrenceRule: stunde.vertretung.value != null
-            ? null
-            : SfCalendar.generateRRule(
-                RecurrenceProperties(
-                    startDate: firstTime,
-                    dayOfWeek: stunde.tag,
-                    recurrenceType: RecurrenceType.weekly,
-                    weekDays: [WeekDays.values[stunde.tag]],
-                    interval: 2,
-                    recurrenceRange: RecurrenceRange.endDate,
-                    endDate: stunde.gueltigBis ?? alternativeEndDate),
-                firstTime,
-                endTime)));
+    //TODO wenn halbe stunde erwischt dann adde vertretenen tag und ein neues appointment für den tag
+
+    if (firstTime.isBefore(endDate) || isVertretung) {
+      appointments.add(Appointment(
+          startTime: firstTime,
+          endTime: endTime,
+          subject: stunde.name,
+          recurrenceExceptionDates: isVertretung ? null : vertreteneTage
+            ?..addAll(schulfreieZeiten
+                .where((e) => //only works if multi day freie tage are from 0:00 to 23:59
+                    (firstTime.hour > e.$1.hour || (firstTime.hour == e.$1.hour && firstTime.minute >= e.$1.minute)) &&
+                    (endTime.hour < e.$2.hour || (endTime.hour == e.$2.hour && endTime.minute <= e.$2.minute)))
+                .map((e) => [for (DateTime i = e.$1; i.isBefore(e.$2); i = i.add(const Duration(days: 1))) i])
+                .expand((element) => element)),
+          notes: stunde.vertretung.value?.toJSON(),
+          recurrenceRule: stunde.vertretung.value != null
+              ? null
+              : SfCalendar.generateRRule(
+                  RecurrenceProperties(
+                      startDate: firstTime,
+                      dayOfWeek: stunde.tag,
+                      recurrenceType: RecurrenceType.weekly,
+                      weekDays: [WeekDays.values[stunde.tag]],
+                      interval: 2,
+                      recurrenceRange: RecurrenceRange.endDate,
+                      endDate: endDate),
+                  firstTime,
+                  endTime)));
+    }
   }
   appointments.addAll(termine);
 
