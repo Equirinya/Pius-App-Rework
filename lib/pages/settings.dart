@@ -39,13 +39,16 @@ Map<String, Duration> durations = {
   "1 Woche": const Duration(days: 7),
 };
 
+const List<(int, int)> stundenZeiten = [(7, 55), (8, 40), (9, 45), (10, 35), (11, 25), (12, 40), (13, 25), (14, 30), (15, 15), (16, 00), (16, 45)]; //TODO make editable
+
 //STundenzeiten
 //anzeigen der pius termine
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key, required this.isar}) : super(key: key);
+  const SettingsPage({Key? key, required this.isar, required this.refresh}) : super(key: key);
 
   final Isar isar;
+  final VoidCallback refresh;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -137,6 +140,8 @@ class _SettingsPageState extends State<SettingsPage> {
                             setState(() {
                               state = 1;
                             });
+                            String lastUsername = await securePrefs.read(key: "username") ?? "";
+                            String lastPassword = await securePrefs.read(key: "password") ?? "";
                             await securePrefs.write(key: "username", value: usernameController.text);
                             await securePrefs.write(key: "password", value: passwordController.text);
 
@@ -147,18 +152,23 @@ class _SettingsPageState extends State<SettingsPage> {
                                 state = 0;
                                 error = e.msg;
                               });
+                              securePrefs.write(key: "username", value: lastUsername);
+                              securePrefs.write(key: "password", value: lastPassword);
                               return;
                             } catch (e) {
                               setState(() {
                                 state = 0;
                                 error = "Unerwarteter Fehler: ${e.toString()}";
                               });
+                              securePrefs.write(key: "username", value: lastUsername);
+                              securePrefs.write(key: "password", value: lastPassword);
                               return;
                             }
                             setState(() {
                               state = 2;
                             });
                             await Future.delayed(const Duration(seconds: 1));
+                            widget.refresh();
 
                             Navigator.of(context).pop();
                           }
@@ -179,235 +189,271 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  List<(String, String?, IconData, List<(String?, List<(String, String?, IconData, String, SettingType, dynamic)>)>)> getSettings() => [
+        (
+          "Verbindung und Aktualisierungen",
+          "Login, Benachrichtigungen, Hintergrundaktualisierung",
+          Ionicons.globe_outline,
+          [
+            (
+              "Login", //TODO make new login settingstype
+              [
+                ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () => newLogin(context)),
+              ]
+            ),
+            (
+              "Hintergrundaktualisierung",
+              [
+                (
+                  "Vertretungsplan",
+                  "Aktualisiere den Vertretungsplan im Hintergrund",
+                  Ionicons.refresh_outline,
+                  "background",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+                (
+                  "Vertretungsplan Update Intervall",
+                  "Der Vertretungsplan wird im Hintergrund nach diesem Intervall aktualisiert",
+                  Ionicons.refresh_circle_outline,
+                  "vertretungUpdateDuration",
+                  SettingType.selection,
+                  (durations.keys.toList(), 3),
+                ),
+                (
+                  "Vertretungsplan Update Wifi Only",
+                  "Aktualisiere Vertretungsplan nur bei WLAN Verbindung.",
+                  Ionicons.wifi_outline,
+                  "vertretungUpdateWifi",
+                  SettingType.bool,
+                  null,
+                ),
+              ]
+            ),
+            if (prefs.getBool("background") ?? true)
+              (
+                "Benachrichtigungen",
+                [
+                  (
+                    "Zeige Benachrichtigungen",
+                    "Zeige Benachrichtigungen passend zu deinen Kursen",
+                    Ionicons.notifications,
+                    "showNotifications",
+                    SettingType.boolDefaultTrue,
+                    null
+                  ),
+                ]
+              ),
+            (
+              "Stundenplan und Termine Aktualisierung",
+              [
+                (
+                  "Pius-Termine Update Intervall",
+                  "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
+                  Ionicons.refresh_circle_outline,
+                  "termineUpdateDuration",
+                  SettingType.selection,
+                  (durations.keys.toList(), 8),
+                ),
+                (
+                  "Termine Update Wifi Only",
+                  "Aktualisiere Termine nur bei WLAN Verbindung.",
+                  Ionicons.wifi_outline,
+                  "termineUpdateWifi",
+                  SettingType.boolDefaultTrue,
+                  null,
+                ),
+                (
+                  "Stundenplan Update Intervall",
+                  "Der Stundenplan wird bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
+                  Ionicons.refresh_circle_outline,
+                  "stundenplanUpdateDuration",
+                  SettingType.selection,
+                  (durations.keys.toList(), 8),
+                ),
+                (
+                  "Stundenplan Update Wifi Only",
+                  "Aktualisiere Stundenplan nur bei WLAN Verbindung.",
+                  Ionicons.wifi_outline,
+                  "stundenplanUpdateWifi",
+                  SettingType.boolDefaultTrue,
+                  null,
+                ),
+              ]
+            ),
+          ]
+        ),
+        (
+          "Anzeige",
+          "Dunkles Farbschema, dynamische Farben, Abkürzungen",
+          Ionicons.color_palette,
+          [
+            (
+              "Farbauswahl",
+              [
+                (
+                  "Aktuelle Farben",
+                  "-",
+                  Ionicons.color_palette,
+                  "-",
+                  SettingType.custom,
+                  ColorPaletteSelectionTile(
+                    isar: widget.isar,
+                    prefs: prefs,
+                  )
+                ),
+                (
+                  "Dark Mode",
+                  "System, Light oder Dark Mode?",
+                  Ionicons.moon_outline,
+                  "darkMode",
+                  SettingType.selectionWithConfirm,
+                  (["System", "Light", "Dark"], 0, () => ColorChangedNotification().dispatch(context))
+                ),
+              ]
+            ),
+          ]
+        ),
+        (
+          "Stundenplan",
+          "Anpassungen der Stundenplan Ansicht",
+          Ionicons.calendar_outline,
+          [
+            (
+              "Inhalt",
+              [
+                (
+                  "Zeige Pius-Termine",
+                  "Zeige die Termine des offiziellen Pius Kalendars im Stundenplan",
+                  Ionicons.newspaper_outline,
+                  "showTermine",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+                (
+                "Zeige Feiertage",
+                "Zeige die offiziellen NRW Feiertage im Stundenplan",
+                Ionicons.briefcase_outline,
+                "showFeiertage",
+                SettingType.boolDefaultTrue,
+                null
+                ),
+              ]
+            ),
+            (
+            "unterrichtsfreie Zeiten",
+            [
+              (
+              "Pius-Termine unterrichtsfrei",
+              "Lese unterrichtsfreie Tage und Stunden aus den Terminen des Pius Kalenders aus",
+              Ionicons.newspaper_outline,
+              "termineFrei",
+              SettingType.boolDefaultTrue,
+              null
+              ),
+              (
+              "Feiertage als unterrichtsfrei",
+              "Zeige keinen Unterricht an den offiziellen NRW Feiertagen",
+              Ionicons.briefcase_outline,
+              "feiertageFrei",
+              SettingType.boolDefaultTrue,
+              null
+              ),
+            ]
+            ),
+          ]
+        ),
+        (
+          "Vertretungsplan",
+          "Anpassungen der Vertretungsplan Ansicht",
+          Ionicons.reorder_four,
+          [
+            (
+              "Inhalt",
+              [
+                (
+                  "Nutze Abkürzungen",
+                  "Kürze die Überschriften innerhalb des Vertretungsplans ab",
+                  Ionicons.sparkles_outline,
+                  "abbreviations",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+                (
+                  "Sortiere Vertretungen nach Klasse",
+                  "Wähle aus nach welchem System die Reihenfolge der Vertretungen auf dem Vertretungsplan entschieden wird.",
+                  Ionicons.shuffle_outline,
+                  "vertretungen_sort",
+                  SettingType.selection,
+                  (["betroffen-Feld der Website", "Reihenfolge der Website", "Alphabetisch"], 0)
+                ),
+              ]
+            ),
+          ]
+        ),
+        (
+          "Erweiterte Einstellungen",
+          "Diese Einstellungen sollten in den meisten Fällen nicht geändert werden müssen",
+          Ionicons.code_working_outline,
+          [
+            (
+              "Website URLs",
+              [
+                (
+                  "Stundenplan Website",
+                  "Die URL der Stundenpläne",
+                  Ionicons.globe_outline,
+                  "website_url_stundenplan",
+                  SettingType.string,
+                  "https://www.pius-gymnasium.de/stundenplaene"
+                ),
+                (
+                  "Vertretungsplan Website",
+                  "Die URL des Vertretungsplans",
+                  Ionicons.globe_outline,
+                  "website_url_vertretungsplan",
+                  SettingType.string,
+                  "https://www.pius-gymnasium.de/vertretungsplan"
+                ),
+                (
+                  "Pius Termine Website",
+                  "Die URL des ICS Kalenders der Pius Termine",
+                  Ionicons.globe_outline,
+                  "website_url_termine",
+                  SettingType.string,
+                  "https://www.pius-gymnasium.de/pius-kalender.ics"
+                ),
+              ]
+            ),
+          ]
+        ),
+        (
+          "Über",
+          "Kontakt, Impressum, Datenschutz",
+          Ionicons.information_circle,
+          [
+            (
+              "",
+              [
+                (
+                  "Über",
+                  "App Informationen und Lizenzen",
+                  Ionicons.information_circle,
+                  "ueber",
+                  SettingType.flutterAbout,
+                  "Entwicklung Pius-Logo: Benedikt Seidl"
+                ),
+              ]
+            ),
+          ]
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     if (!initialized) return const Center(child: CircularProgressIndicator());
 
     TextStyle? titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary);
-
-    final List<(String, String?, IconData, List<(String?, List<(String, String?, IconData, String, SettingType, dynamic)>)>)> settings = [
-      (
-        "Verbindung und Aktualisierungen",
-        "Login, Benachrichtigungen, Hintergrundaktualisierung",
-        Ionicons.globe_outline,
-        [
-          (
-            "Login", //TODO make new login settingstype
-            [
-              ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () => newLogin(context)),
-            ]
-          ),
-          (
-            "Hintergrundaktualisierung",
-            [
-              ("Vertretungsplan", "Aktualisiere den Vertretungsplan im Hintergrund", Ionicons.refresh_outline, "background", SettingType.boolDefaultTrue, null),
-              (
-                "Vertretungsplan Update Intervall",
-                "Der Vertretungsplan wird im Hintergrund nach diesem Intervall aktualisiert",
-                Ionicons.refresh_circle_outline,
-                "vertretungUpdateDuration",
-                SettingType.selection,
-                (durations.keys.toList(), 3),
-              ),
-              (
-                "Vertretungsplan Update Wifi Only",
-                "Aktualisiere Vertretungsplan nur bei WLAN Verbindung.",
-                Ionicons.wifi_outline,
-                "vertretungUpdateWifi",
-                SettingType.bool,
-                null,
-              ),
-            ]
-          ),
-          if (prefs.getBool("background") ?? true)
-            (
-              "Benachrichtigungen",
-              [
-                (
-                  "Zeige Benachrichtigungen",
-                  "Zeige Benachrichtigungen passend zu deinen Kursen",
-                  Ionicons.notifications,
-                  "showNotifications",
-                  SettingType.boolDefaultTrue,
-                  null
-                ),
-              ]
-            ),
-          (
-            "Stundenplan und Termine Aktualisierung",
-            [
-              (
-                "Pius-Termine Update Intervall",
-                "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
-                Ionicons.refresh_circle_outline,
-                "termineUpdateDuration",
-                SettingType.selection,
-                (durations.keys.toList(), 8),
-              ),
-              (
-                "Termine Update Wifi Only",
-                "Aktualisiere Termine nur bei WLAN Verbindung.",
-                Ionicons.wifi_outline,
-                "termineUpdateWifi",
-                SettingType.boolDefaultTrue,
-                null,
-              ),
-              (
-                "Stundenplan Update Intervall",
-                "Der Stundenplan wird bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
-                Ionicons.refresh_circle_outline,
-                "stundenplanUpdateDuration",
-                SettingType.selection,
-                (durations.keys.toList(), 8),
-              ),
-              (
-                "Stundenplan Update Wifi Only",
-                "Aktualisiere Stundenplan nur bei WLAN Verbindung.",
-                Ionicons.wifi_outline,
-                "stundenplanUpdateWifi",
-                SettingType.boolDefaultTrue,
-                null,
-              ),
-            ]
-          ),
-        ]
-      ),
-      (
-        "Anzeige",
-        "Dunkles Farbschema, dynamische Farben, Abkürzungen",
-        Ionicons.color_palette,
-        [
-          (
-            "Farbauswahl",
-            [
-              (
-                "Aktuelle Farben",
-                "-",
-                Ionicons.color_palette,
-                "-",
-                SettingType.custom,
-                ColorPaletteSelectionTile(
-                  isar: widget.isar,
-                  prefs: prefs,
-                )
-              ),
-              (
-                "Dark Mode",
-                "System, Light oder Dark Mode?",
-                Ionicons.moon_outline,
-                "darkMode",
-                SettingType.selectionWithConfirm,
-                (["System", "Light", "Dark"], 0, () => ColorChangedNotification().dispatch(context))
-              ),
-            ]
-          ),
-        ]
-      ),
-      (
-        "Stundenplan",
-        "Anpassungen der Stundenplan Ansicht",
-        Ionicons.calendar_outline,
-        [
-          (
-            "Inhalt",
-            [
-              (
-                "Zeige Pius-Termine",
-                "Zeige die Termine des offiziellen Pius Kalendars im Stundenplan",
-                Ionicons.newspaper_outline,
-                "showTermine",
-                SettingType.boolDefaultTrue,
-                null
-              ),
-            ]
-          ),
-        ]
-      ),
-      (
-        "Vertretungsplan",
-        "Anpassungen der Vertretungsplan Ansicht",
-        Ionicons.reorder_four,
-        [
-          (
-            "Inhalt",
-            [
-              (
-                "Nutze Abkürzungen",
-                "Kürze die Überschriften innerhalb des Vertretungsplans ab",
-                Ionicons.sparkles_outline,
-                "abbreviations",
-                SettingType.boolDefaultTrue,
-                null
-              ),
-              (
-                "Sortiere Vertretungen nach Klasse",
-                "Wähle aus nach welchem System die Reihenfolge der Vertretungen auf dem Vertretungsplan entschieden wird.",
-                Ionicons.shuffle_outline,
-                "vertretungen_sort",
-                SettingType.selection,
-                (["betroffen-Feld der Website", "Reihenfolge der Website", "Alphabetisch"], 0)
-              ),
-            ]
-          ),
-        ]
-      ),
-      (
-        "Erweiterte Einstellungen",
-        "Diese Einstellungen sollten in den meisten Fällen nicht geändert werden müssen",
-        Ionicons.code_working_outline,
-        [
-          (
-            "Website URLs",
-            [
-              (
-                "Stundenplan Website",
-                "Die URL der Stundenpläne",
-                Ionicons.globe_outline,
-                "website_url_stundenplan",
-                SettingType.string,
-                "https://www.pius-gymnasium.de/stundenplaene"
-              ),
-              (
-                "Vertretungsplan Website",
-                "Die URL des Vertretungsplans",
-                Ionicons.globe_outline,
-                "website_url_vertretungsplan",
-                SettingType.string,
-                "https://www.pius-gymnasium.de/vertretungsplan"
-              ),
-              (
-                "Pius Termine Website",
-                "Die URL des ICS Kalenders der Pius Termine",
-                Ionicons.globe_outline,
-                "website_url_termine",
-                SettingType.string,
-                "https://www.pius-gymnasium.de/pius-kalender.ics"
-              ),
-            ]
-          ),
-        ]
-      ),
-      (
-        "Über",
-        "Kontakt, Impressum, Datenschutz",
-        Ionicons.information_circle,
-        [
-          (
-            "",
-            [
-              (
-                "Über",
-                "App Informationen und Lizenzen",
-                Ionicons.information_circle,
-                "ueber",
-                SettingType.flutterAbout,
-                "Entwicklung Pius-Logo: Benedikt Seidl"
-              ),
-            ]
-          ),
-        ]
-      ),
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -418,185 +464,183 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 128, top: 16),
         children: [
-          for (final (title, subtitle, icon, sections) in settings)
+          for (final (index, (title, subtitle, icon, sections)) in getSettings().indexed)
             ListTile(
               leading: Icon(icon),
               title: Text(title, style: Theme.of(context).textTheme.titleLarge),
               subtitle: subtitle != null ? Text(subtitle) : null,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (context) => StatefulBuilder(
-                        builder: (context, setState) => Scaffold(
-                          //TODO is StatefulBuilder needed?
-                          appBar: AppBar(
-                            title: Text(title),
-                            // backgroundColor: Theme.of(context).colorScheme.background,
-                            // leading: IconButton(
-                            //   icon: const Icon(Ionicons.arrow_back),
-                            //   onPressed: () => Navigator.of(context).pop(),
-                            // ),
-                          ),
-                          body: ListView(
-                            padding: const EdgeInsets.only(bottom: 128, top: 16),
-                            children: [
-                              for (final (title, settings) in sections)
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (title != null && title.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 16),
-                                        child: Text(
-                                          title,
-                                          style: titleStyle,
+                        builder: (context, setState) {
+                          List<(String?, List<(String, String?, IconData, String, SettingType, dynamic)>)> sections = getSettings()[index].$4;
+                          return Scaffold(
+                            appBar: AppBar(
+                              title: Text(title),
+                            ),
+                            body: ListView(
+                              padding: const EdgeInsets.only(bottom: 128, top: 16),
+                              children: [
+                                for (final (title, settings) in sections)
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (title != null && title.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 16),
+                                          child: Text(
+                                            title,
+                                            style: titleStyle,
+                                          ),
                                         ),
-                                      ),
-                                    for (final (title, subtitle, icon, setting, type, extra) in settings)
-                                      Builder(
-                                        builder: (context) {
-                                          switch (type) {
-                                            case SettingType.text:
-                                              return ListTile(
-                                                title: Text(title),
-                                                subtitle: subtitle != null ? Text(subtitle) : null,
-                                                leading: Icon(icon),
-                                              );
-                                            case SettingType.string:
-                                              return ListTile(
+                                      for (final (title, subtitle, icon, setting, type, extra) in settings)
+                                        Builder(
+                                          builder: (context) {
+                                            switch (type) {
+                                              case SettingType.text:
+                                                return ListTile(
                                                   title: Text(title),
-                                                  subtitle: Text(prefs.getString(setting) ?? extra),
+                                                  subtitle: subtitle != null ? Text(subtitle) : null,
                                                   leading: Icon(icon),
-                                                  onTap: () => showDialog(
-                                                      context: context,
-                                                      builder: (context) {
-                                                        TextEditingController controller = TextEditingController(text: prefs.getString(setting) ?? extra);
-                                                        return StatefulBuilder(
-                                                            builder: (context, setState) => AlertDialog(
-                                                                  icon: Icon(icon),
-                                                                  title: Text(title),
-                                                                  content: TextField(
-                                                                    controller: controller,
-                                                                  ),
-                                                                  actions: [
-                                                                    TextButton(
-                                                                        style: TextButton.styleFrom(
-                                                                            backgroundColor: Theme.of(context).colorScheme.primaryContainer),
-                                                                        onPressed: () {
-                                                                          Navigator.of(context).pop();
-                                                                          prefs.setString(setting, controller.text);
-                                                                        },
-                                                                        child: const Text("Bestätigen")),
-                                                                    TextButton(
-                                                                        onPressed: () {
-                                                                          Navigator.of(context).pop();
-                                                                        },
-                                                                        child: const Text("Abbrechen"))
-                                                                  ],
-                                                                ));
-                                                      }).then((value) => setState(() {})));
-                                            case SettingType.boolDefaultTrue:
-                                            case SettingType.bool:
-                                              return SwitchListTile(
-                                                title: Text(title),
-                                                subtitle: subtitle != null ? Text(subtitle) : null,
-                                                secondary: Icon(icon),
-                                                value: prefs.getBool(setting) ?? (type == SettingType.boolDefaultTrue),
-                                                onChanged: (value) {
-                                                  prefs.setBool(setting, value);
-                                                  setState(() {});
-                                                },
-                                              );
-                                            case SettingType.selectionWithConfirm:
-                                            case SettingType.selection:
-                                              List<String> options = List<String>.from(extra.$1);
-                                              int fallbackIndex = extra.$2;
-                                              //(type == SettingType.selectionWithConfirm) ? (extra as (List<String>, VoidCallback)).$1 : extra);
-                                              return ListTile(
-                                                  title: Text(title),
-                                                  subtitle: Text(options[prefs.getInt(setting) ?? fallbackIndex]),
-                                                  leading: Icon(icon),
-                                                  onTap: () => showDialog(
-                                                      context: context,
-                                                      builder: (context) {
-                                                        int index = prefs.getInt(setting) ?? fallbackIndex;
-                                                        return StatefulBuilder(
-                                                            builder: (context, setState) => AlertDialog(
-                                                                  icon: Icon(icon),
-                                                                  title: Text(title),
-                                                                  content: SingleChildScrollView(
-                                                                    child: Column(
-                                                                      mainAxisSize: MainAxisSize.min,
-                                                                      children: [
-                                                                        Text(subtitle ?? ""),
-                                                                        const SizedBox(height: 16),
-                                                                        for (final option in options)
-                                                                          RadioListTile(
-                                                                            title: Text(option),
-                                                                            value: option,
-                                                                            groupValue: options[index],
-                                                                            onChanged: (value) {
-                                                                              index = options.indexOf(value ?? options[0]);
-                                                                              setState(() {});
-                                                                            },
-                                                                          )
-                                                                      ],
+                                                );
+                                              case SettingType.string:
+                                                return ListTile(
+                                                    title: Text(title),
+                                                    subtitle: Text(prefs.getString(setting) ?? extra),
+                                                    leading: Icon(icon),
+                                                    onTap: () => showDialog(
+                                                        context: context,
+                                                        builder: (context) {
+                                                          TextEditingController controller = TextEditingController(text: prefs.getString(setting) ?? extra);
+                                                          return StatefulBuilder(
+                                                              builder: (context, setState) => AlertDialog(
+                                                                    icon: Icon(icon),
+                                                                    title: Text(title),
+                                                                    content: TextField(
+                                                                      controller: controller,
                                                                     ),
-                                                                  ),
-                                                                  actions: [
-                                                                    TextButton(
-                                                                        style: TextButton.styleFrom(
-                                                                            backgroundColor: Theme.of(context).colorScheme.primaryContainer),
-                                                                        onPressed: () {
-                                                                          Navigator.of(context).pop();
-                                                                          prefs.setInt(setting, index);
-                                                                          if (type == SettingType.selectionWithConfirm) {
-                                                                            extra.$3();
-                                                                          }
-                                                                        },
-                                                                        child: const Text("Bestätigen")),
-                                                                    TextButton(
-                                                                        onPressed: () {
-                                                                          Navigator.of(context).pop();
-                                                                        },
-                                                                        child: const Text("Abbrechen"))
-                                                                  ],
-                                                                ));
-                                                      }).then((value) => setState(() {})));
-                                            case SettingType.customTap:
-                                              return ListTile(
-                                                title: Text(title),
-                                                subtitle: subtitle != null ? Text(subtitle) : null,
-                                                leading: Icon(icon),
-                                                onTap: () => extra(),
-                                              );
-                                            case SettingType.custom:
-                                              return extra;
-                                            case SettingType.flutterAbout:
-                                              return ListTile(
-                                                title: Text(title),
-                                                subtitle: subtitle != null ? Text(subtitle) : null,
-                                                leading: Icon(icon),
-                                                onTap: () async {
-                                                  PackageInfo packageInfo = await PackageInfo.fromPlatform();
-                                                  if (context.mounted) {
-                                                    showAboutDialog(
-                                                      context: context,
-                                                      applicationIcon: Image.asset("assets/icon/icon_transparent.png", height: 64, width: 64),
-                                                      applicationName: packageInfo.appName,
-                                                      applicationVersion: packageInfo.version,
-                                                      applicationLegalese: extra,
-                                                    );
-                                                  }
-                                                },
-                                              );
-                                          }
-                                        },
-                                      )
-                                  ],
-                                )
-                            ],
-                          ),
-                        ),
+                                                                    actions: [
+                                                                      TextButton(
+                                                                          style: TextButton.styleFrom(
+                                                                              backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                                                                          onPressed: () {
+                                                                            Navigator.of(context).pop();
+                                                                            prefs.setString(setting, controller.text);
+                                                                          },
+                                                                          child: const Text("Bestätigen")),
+                                                                      TextButton(
+                                                                          onPressed: () {
+                                                                            Navigator.of(context).pop();
+                                                                          },
+                                                                          child: const Text("Abbrechen"))
+                                                                    ],
+                                                                  ));
+                                                        }).then((value) => setState(() {})));
+                                              case SettingType.boolDefaultTrue:
+                                              case SettingType.bool:
+                                                return SwitchListTile(
+                                                  title: Text(title),
+                                                  subtitle: subtitle != null ? Text(subtitle) : null,
+                                                  secondary: Icon(icon),
+                                                  value: prefs.getBool(setting) ?? (type == SettingType.boolDefaultTrue),
+                                                  onChanged: (value) {
+                                                    prefs.setBool(setting, value);
+                                                    setState(() {});
+                                                  },
+                                                );
+                                              case SettingType.selectionWithConfirm:
+                                              case SettingType.selection:
+                                                List<String> options = List<String>.from(extra.$1);
+                                                int fallbackIndex = extra.$2;
+                                                //(type == SettingType.selectionWithConfirm) ? (extra as (List<String>, VoidCallback)).$1 : extra);
+                                                return ListTile(
+                                                    title: Text(title),
+                                                    subtitle: Text(options[prefs.getInt(setting) ?? fallbackIndex]),
+                                                    leading: Icon(icon),
+                                                    onTap: () => showDialog(
+                                                        context: context,
+                                                        builder: (context) {
+                                                          int index = prefs.getInt(setting) ?? fallbackIndex;
+                                                          return StatefulBuilder(
+                                                              builder: (context, setState) => AlertDialog(
+                                                                    icon: Icon(icon),
+                                                                    title: Text(title),
+                                                                    content: SingleChildScrollView(
+                                                                      child: Column(
+                                                                        mainAxisSize: MainAxisSize.min,
+                                                                        children: [
+                                                                          Text(subtitle ?? ""),
+                                                                          const SizedBox(height: 16),
+                                                                          for (final option in options)
+                                                                            RadioListTile(
+                                                                              title: Text(option),
+                                                                              value: option,
+                                                                              groupValue: options[index],
+                                                                              onChanged: (value) {
+                                                                                index = options.indexOf(value ?? options[0]);
+                                                                                setState(() {});
+                                                                              },
+                                                                            )
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    actions: [
+                                                                      TextButton(
+                                                                          style: TextButton.styleFrom(
+                                                                              backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                                                                          onPressed: () {
+                                                                            Navigator.of(context).pop();
+                                                                            prefs.setInt(setting, index);
+                                                                            if (type == SettingType.selectionWithConfirm) {
+                                                                              extra.$3();
+                                                                            }
+                                                                          },
+                                                                          child: const Text("Bestätigen")),
+                                                                      TextButton(
+                                                                          onPressed: () {
+                                                                            Navigator.of(context).pop();
+                                                                          },
+                                                                          child: const Text("Abbrechen"))
+                                                                    ],
+                                                                  ));
+                                                        }).then((value) => setState(() {})));
+                                              case SettingType.customTap:
+                                                return ListTile(
+                                                  title: Text(title),
+                                                  subtitle: subtitle != null ? Text(subtitle) : null,
+                                                  leading: Icon(icon),
+                                                  onTap: () => extra(),
+                                                );
+                                              case SettingType.custom:
+                                                return extra;
+                                              case SettingType.flutterAbout:
+                                                return ListTile(
+                                                  title: Text(title),
+                                                  subtitle: subtitle != null ? Text(subtitle) : null,
+                                                  leading: Icon(icon),
+                                                  onTap: () async {
+                                                    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+                                                    if (context.mounted) {
+                                                      showAboutDialog(
+                                                        context: context,
+                                                        applicationIcon: Image.asset("assets/icon/icon_transparent.png", height: 64, width: 64),
+                                                        applicationName: packageInfo.appName,
+                                                        applicationVersion: packageInfo.version,
+                                                        applicationLegalese: extra,
+                                                      );
+                                                    }
+                                                  },
+                                                );
+                                            }
+                                          },
+                                        ),
+                                      SizedBox(height: 32),
+                                    ],
+                                  )
+                              ],
+                            ),
+                          );
+                        },
                       ))),
             )
         ],

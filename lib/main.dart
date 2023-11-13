@@ -16,10 +16,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-//TODO update Flow with new stundenplan overlapping
-//TODO if new stundenplan detected setze gueltig bis for old ones
+//TODO über
+//TODO carousel on first startup
+//TODO syncfusion
 
-//TODO what happens when more than two pdfs for stundenplan are shown
+//FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+//         FlutterLocalNotificationsPlugin();
+// flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+//     AndroidFlutterLocalNotificationsPlugin>().requestNotificationsPermission();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -106,6 +110,7 @@ class _MyAppState extends State<MyApp> {
           }
 
           return MaterialApp(
+            debugShowCheckedModeBanner: false,
             supportedLocales: const [
               Locale('de'),
             ],
@@ -184,7 +189,7 @@ class OuterPage extends StatefulWidget {
 class _OuterPageState extends State<OuterPage> {
   late SharedPreferences prefs;
   bool initialized = false;
-  ValueNotifier<bool?> vertretungsLoadingNotifier = ValueNotifier(true);
+  ValueNotifier<bool?> vertretungsLoadingNotifier = ValueNotifier(false);
   ValueNotifier<bool?> calendarLoadingNotifier = ValueNotifier(false);
 
   @override
@@ -195,13 +200,17 @@ class _OuterPageState extends State<OuterPage> {
       setState(() {
         _selectedIndex = prefs.getInt("selectedPage") ?? 0;
       });
+      Connectivity().checkConnectivity().then((value) {
+        if(!(prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+          loadVertretungsplan();
+        }
+      });
+      loadCalendarContent();
     });
-    loadVertretungsplan();
     super.initState();
   }
 
   void loadVertretungsplan() async {
-    if(!(prefs.getBool("vertretungUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi) {
       vertretungsLoadingNotifier.value = true;
       try {
         String vertretungsplanWebsite = await getVertretungsplanWebsite();
@@ -211,32 +220,37 @@ class _OuterPageState extends State<OuterPage> {
       on Exception {
         vertretungsLoadingNotifier.value = null;
       }
-    }
   }
 
   void loadCalendarContent() async {
-    bool shouldUpdateTermine = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("termineUpdateDuration") ?? 3)));
-    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("stundenplanUpdateDuration") ?? 3)));
+    bool shouldUpdateTermine = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("termineUpdateDuration") ?? 8)));
+    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("stundenplanUpdateDuration") ?? 8)));
     if(shouldUpdateTermine || shouldUpdateStundenplan){
       calendarLoadingNotifier.value = true;
       bool failed = false;
       if(shouldUpdateTermine && (!(prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
-        print("Updating Termine");
+        // print("Updating Termine");
         try{
           await updateTermine();
           prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
         }
-        on Exception{
+        on Exception catch (e){
+          if (kDebugMode) {
+            print(e);
+          }
           failed = true;
         }
       }
       if(shouldUpdateStundenplan && (!(prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
-        print("Updating Stundenplan");
+        // print("Updating Stundenplan");
         try{
-          //TODO update Stundenplan
+          await updateStundenplan(widget.isar);
           prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);
         }
-        on Exception{
+        on Exception catch (e){
+          if (kDebugMode) {
+            print(e);
+          }
           failed = true;
         }
       }
@@ -255,7 +269,14 @@ class _OuterPageState extends State<OuterPage> {
         children: [
           StundenplanPage(isar: widget.isar, vertretungsLoading: vertretungsLoadingNotifier, calendarLoading: calendarLoadingNotifier,),
           VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
-          SettingsPage(isar: widget.isar),
+          SettingsPage(isar: widget.isar, refresh: (){
+            Connectivity().checkConnectivity().then((value) {
+              if(!(prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+                loadVertretungsplan();
+              }
+            });
+            loadCalendarContent();
+          }),
         ],
       ),
       bottomNavigationBar: NavigationBar(
