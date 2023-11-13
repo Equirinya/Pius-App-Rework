@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -20,6 +22,7 @@ const String baseUrl = "https://www.pius-gymnasium.de";
 const String stundenplanUrl = baseUrl + "/stundenplaene";
 const String vertretungsplanUrl = baseUrl + "/vertretungsplan";
 const String termineUrl = baseUrl + "/pius-kalender.ics";
+const String feiertagUrl = "https://get.api-feiertage.de/?states=nw";
 
 class ColorChangedNotification extends Notification {}
 
@@ -47,11 +50,34 @@ Future<List<Appointment>> getPiusTermine() async {
   return termine;
 }
 
+Future<List<Appointment>> getFeiertagTermine() async {
+  http.Response response = await http.get(Uri.parse(feiertagUrl));
+
+  if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode}");
+  List<Appointment> termine = List<Appointment>.from(jsonDecode(response.body)["feiertage"]
+      .map((e) {
+    DateTime startTime = DateTime.parse(e["date"]);
+    DateTime endTime = startTime.add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
+    return Appointment(
+      startTime: startTime,
+      endTime: endTime,
+      subject: e["fname"],
+      isAllDay: true,
+    );
+  }));
+  return termine;
+}
+
 Future<void> updateTermine() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   List<Appointment> termine = await getPiusTermine();
+  List<Appointment> feiertagTermine = await getFeiertagTermine();
   String termineString = jsonEncode(termine.map((e) => appointmentToMap(e)).toList());
+  String feiertagTermineString = jsonEncode(feiertagTermine.map((e) => appointmentToMap(e)).toList());
+  print(termineString);
+  print(feiertagTermineString);
   prefs.setString("piusTermine", termineString);
+  prefs.setString("feiertagTermine", feiertagTermineString);
   return;
 }
 
@@ -71,108 +97,148 @@ Appointment appointmentFromMap(Map<String, dynamic> map) => Appointment(
 Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenplaene() async {
   DOM.Document document = parse(await getStundenplanWebsite());
 
-  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = await getStundenplanLinks(document, true);
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = await getStundenplanLinks(document);
 
-  if (stundenplaene.length % 2 != 0) throw Exception("wrong amount of stundenplaene");
+  if (stundenplaene.length < 2) throw Exception("less than 2 stundenplaene found");
 
   try {
-    print(stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1)));
-    Uint8List klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
-    Uint8List oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+    String klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)))
+        .firstWhere((element) => element.$1.isBefore(DateTime.now()))
+        .$4;
+    String oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)))
+        .firstWhere((element) => element.$1.isBefore(DateTime.now()))
+        .$4;
 
-    return (PdfDocument(inputBytes: klassenplan), PdfDocument(inputBytes: oberstufenplan));
+    return (PdfDocument(inputBytes: (await getSecuredPage(klassenplan)).bodyBytes), PdfDocument(inputBytes: (await getSecuredPage(oberstufenplan)).bodyBytes));
   } catch (e) {
     throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
   }
 }
 
-Future<void> updateStundenplan() async {
+Future<void> updateStundenplan(Isar isar) async {
   DOM.Document document = parse(await getStundenplanWebsite());
 
-  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = await getStundenplanLinks(document, true);
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? stufe = prefs.getString("stundenplanStufe");
+  bool? isOberstufe = prefs.getBool("stundenplanIsOberstufe");
+  if (stufe == null || isOberstufe == null || stufe.isEmpty) throw Exception("No stufe found");
 
-  if (stundenplaene.length % 2 != 0) throw Exception("wrong amount of stundenplaene");
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = await getStundenplanLinks(document);
+  stundenplaene = stundenplaene.where((element) => element.$3 == isOberstufe).toList();
+  if (stundenplaene.isEmpty) throw Exception("No stundenplan found");
+  stundenplaene.sort((a, b) => -a.$1.compareTo(b.$1));
 
-  try {
-    print(stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1)));
-    Uint8List klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
-    Uint8List oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => a.$1.compareTo(b.$1))).firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+  int lastUpdate = prefs.getInt("stundenplanLastUpdate") ?? 0;
 
-    return;
-  } catch (e) {
-    throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
+
+  List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
+  List<DateTime> existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+  print("existingGueltigAb: ${existingGueltigAb.length}");
+  List<DateTime> neueGueltigAb = stundenplaene.map((e) => e.$1).toList();
+
+  List<DateTime> toDelete = existingGueltigAb.where((element) => !neueGueltigAb.contains(element)).toList();
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> toAdd = stundenplaene.where((element) => !existingGueltigAb.contains(element.$1)).toList();
+
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stayedSame = stundenplaene.where((element) => existingGueltigAb.contains(element.$1)).toList();
+  stayedSame.retainWhere((element) => element.$2.millisecondsSinceEpoch > lastUpdate);
+  // print("stayed same. ${stayedSame.length}");
+  // print("to delete. ${toDelete.length}");
+  // print("to add. ${toAdd.length}");
+
+  toDelete.addAll(stayedSame.map((e) => e.$1));
+  toAdd.addAll(stayedSame);
+
+  toAdd.sort((a, b) => a.$1.compareTo(b.$1));
+
+  for (DateTime gueltigAb in toDelete) {
+    await isar.writeTxn(() async {
+      await isar.stundes.filter().gueltigAbEqualTo(gueltigAb).deleteAll();
+    });
   }
+  existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+  for (var (DateTime gueltigAb, DateTime updated, bool oberstufe, String url) in toAdd) {
+
+    if(existingGueltigAb.isNotEmpty) {
+      List<Stunde> toUpdateStunden =
+      isar.stundes.filter().gueltigAbEqualTo(existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value)).findAllSync();
+
+      await isar.writeTxn(() async {
+        await isar.stundes.putAll(toUpdateStunden.map((e) => e..gueltigBis = gueltigAb).toList());
+      });
+      existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+    }
+
+    List<Stunde> stunden = await compute(getStundenPlan, (stufe, PdfDocument(inputBytes: (await getSecuredPage(url)).bodyBytes), isOberstufe));
+
+    if(isOberstufe) stunden.retainWhere((element) => kurse.contains(element.name));
+    await isar.writeTxn(() async {
+      await isar.stundes.putAll(stunden);
+    });
+  }
+
+  prefs.setInt("stundenplanLastUpdate", stundenplaene.map((e) => e.$2.millisecondsSinceEpoch).reduce(max));
 }
 
-Future<List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)>> getStundenplanLinks(DOM.Document document, bool withData) async {
-  List<(DateTime starting, DateTime updated, bool oberstufe, Uint8List data)> stundenplaene = List.empty(growable: true);
+Future<List<(DateTime starting, DateTime updated, bool oberstufe, String url)>> getStundenplanLinks(DOM.Document document) async {
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = List.empty(growable: true);
   SharedPreferences prefs = await SharedPreferences.getInstance();
   final europeanDateFormatter = DateFormat('dd.MM.yyyy');
 
   for (DOM.Element element in document.body?.querySelectorAll("a") ?? []) {
     if (element.attributes["href"]?.isEmpty ?? true) throw Exception("No href in links");
     String stundenplanUrlMaybeOverriden = prefs.getString("website_url_stundenplan") ?? stundenplanUrl;
-    if (stundenplanUrlMaybeOverriden.endsWith("/")) stundenplanUrlMaybeOverriden.substring(0, stundenplanUrlMaybeOverriden.length - 1);
+    if (!stundenplanUrlMaybeOverriden.endsWith("/")) stundenplanUrlMaybeOverriden += "/";
 
     String name = element.text;
-    Uint8List data = withData ? (await getSecuredPage(stundenplanUrlMaybeOverriden + "/" + element.attributes["href"]!)).bodyBytes : Uint8List(0);
     int parseStart = name.indexOf("ab") + 2;
     while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
     DateTime starting = DateTime.parse(name.substring(parseStart, parseStart + 10));
-    print(starting);
 
     parseStart = name.indexOf("Stand") + 5;
     while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
     DateTime updated = europeanDateFormatter.parse(name.substring(parseStart, parseStart + 10));
-    print(updated);
 
     bool oberstufe = name.toLowerCase().contains("oberstufe");
-    if(!oberstufe && !name.toLowerCase().contains("klasse")) throw Exception("Stundenplan welcher weder als Klasse noch Oberstufe identifizierbar ist gefunden");
-    stundenplaene.add((starting, updated, oberstufe, data));
+    if (!oberstufe && !name.toLowerCase().contains("klasse"))
+      throw Exception("Stundenplan welcher weder als Klasse noch Oberstufe identifizierbar ist gefunden");
+    stundenplaene.add((starting, updated, oberstufe, Uri.parse(stundenplanUrlMaybeOverriden).resolve(element.attributes["href"]!).toString()));
   }
   return stundenplaene;
 }
 
-Future<(List<String> klassen, List<String> oberstufen)> getStufen(PdfDocument klassenplan, PdfDocument oberstufenplan) async {
-  List<String> klassen = List.empty(growable: true);
-  List<String> oberstufen = List.empty(growable: true);
+Future<List<String>> getStufen(PdfDocument plan) async {
+  List<String> stufen = List.empty(growable: true);
 
-  for (int i = 0; i < klassenplan.pages.count; i++) {
-    final PdfPage page = klassenplan.pages[i];
+  for (int i = 0; i < plan.pages.count; i++) {
     //Extracts the text line collection from the document
-    final List<TextLine> lines = PdfTextExtractor(klassenplan).extractTextLines(startPageIndex: i, endPageIndex: i);
+    final List<TextLine> lines = PdfTextExtractor(plan).extractTextLines(startPageIndex: i, endPageIndex: i);
 
-    String klasse = lines[6].text;
-    if (klasse.length > 3 || int.tryParse(klasse[0]) == null) throw Exception("Klassenname in Klassenplan nicht gefunden");
-    klassen.add(klasse);
-  }
-  for (int i = 0; i < oberstufenplan.pages.count; i++) {
-    final PdfPage page = oberstufenplan.pages[i];
-    //Extracts the text line collection from the document
-    final List<TextLine> lines = PdfTextExtractor(oberstufenplan).extractTextLines(startPageIndex: i, endPageIndex: i);
-
-    String oberstufe = lines[6].text;
-    if (oberstufe.length > 3) throw Exception("Stufenname in Oberstufenplan nicht gefunden");
-    oberstufen.add(oberstufe);
+    String stufe = lines[6].text;
+    if (stufe.length > 3 && stufe != "TEST") throw Exception("Stufenname in Oberstufenplan nicht gefunden");
+    stufen.add(stufe);
   }
 
-  return (klassen.toSet().toList(), oberstufen.toSet().toList());
+  //check if known that plan is klassenplan:  if (klasse.length > 3 || int.tryParse(klasse[0]) == null) throw Exception("Klassenname in Klassenplan nicht gefunden");
+  return (stufen.toSet().toList());
 }
 
-Future<List<Stunde>> getStundenPlan(String stufe, PdfDocument klassenplan, PdfDocument oberstufenplan) async {
-  var (klassen, oberstufen) = await getStufen(klassenplan, oberstufenplan);
+Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOberstufe) value) async {
+  String stufe = value.$1;
+  PdfDocument plan = value.$2;
+  bool isOberstufe = value.$3;
 
-  bool isKlasse = klassen.contains(stufe);
-  if (!isKlasse && !oberstufen.contains(stufe)) throw Exception("Stufe nicht gefunden");
+  var stufen = await getStufen(plan);
+
+  // bool isKlasse = klassen.contains(stufe);
+  // if (!isKlasse && !oberstufen.contains(stufe)) throw Exception("Stufe nicht gefunden");
 
   List<Stunde> stunden = List.empty(growable: true);
-  int stufenIndex = isKlasse ? klassen.indexOf(stufe) : oberstufen.indexOf(stufe);
+  int stufenIndex = stufen.indexOf(stufe);
 
-  List<TextLine> lines = isKlasse
-      ? PdfTextExtractor(klassenplan).extractTextLines(startPageIndex: stufenIndex, endPageIndex: stufenIndex)
-      : PdfTextExtractor(oberstufenplan).extractTextLines(startPageIndex: stufenIndex * 2, endPageIndex: stufenIndex * 2);
+  List<TextLine> lines = PdfTextExtractor(plan)
+      .extractTextLines(startPageIndex: isOberstufe ? stufenIndex * 2 : stufenIndex, endPageIndex: isOberstufe ? stufenIndex * 2 : stufenIndex);
 
-  if (lines[6].text != stufe) throw Exception("Reihenfolge von Klassenplan durcheinandergekommen");
+  if (lines[6].text != stufe) throw Exception("Reihenfolge von Stundenplan durcheinandergekmmen : ${lines[6].text} != $stufe");
 
   int index = 6;
   if (!lines[3].text.startsWith("ab ")) throw Exception("kein Startdatum gefunden");
@@ -184,8 +250,8 @@ Future<List<Stunde>> getStundenPlan(String stufe, PdfDocument klassenplan, PdfDo
   //   i2++;
   // }
   for (bool gerade in [false, true]) {
-    if (gerade && !isKlasse) {
-      lines = PdfTextExtractor(oberstufenplan).extractTextLines(startPageIndex: stufenIndex * 2 + 1, endPageIndex: stufenIndex * 2 + 1);
+    if (gerade && isOberstufe) {
+      lines = PdfTextExtractor(plan).extractTextLines(startPageIndex: stufenIndex * 2 + 1, endPageIndex: stufenIndex * 2 + 1);
       index = 6;
     }
     int startSearchDays = index;
@@ -317,7 +383,10 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
 
   if (plan.body?.querySelector("h2")?.text == null || !plan.body!.querySelector("h2")!.text.startsWith("Ticker")) throw Exception("No ticker found");
   DOM.Element ticker = plan.body!.querySelector("h2")!;
-  String tickertext = ticker.nextElementSibling?.text ?? "";
+  DOM.Element? tickerTextElement = ticker.nextElementSibling;
+  if(tickerTextElement != null) tickerTextElement.innerHtml = tickerTextElement.innerHtml.replaceAll("<br>", "\n");
+  String tickertext = tickerTextElement?.text ?? "";
+  tickertext = tickertext.replaceAll("\n\n", "\n").trim();
   ticker.remove();
 
   List<List<Vertretung>> vertretungen = [];
@@ -473,7 +542,7 @@ Future<http.Response> getSecuredPage(String url) async {
   http.Response response = await http.get(Uri.parse(url), headers: authorizationHeaders);
 
   if (response.statusCode == 401) throw const AuthorizationException("Ungültiger Nutzername oder Passwort");
-  if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode}");
+  if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode} while fetching $url");
   return response;
 }
 
