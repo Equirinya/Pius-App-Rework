@@ -60,6 +60,9 @@ dependencies:
   flutter_localization: ^0.1.13
   icalendar_parser: ^2.0.0
 
+  background_fetch: ^1.2.1
+
+
 dev_dependencies:
   isar_generator: ^3.0.5
   build_runner: any
