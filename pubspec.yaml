@@ -52,7 +52,7 @@ dependencies:
   flex_color_picker: ^3.3.0
   flex_seed_scheme: ^1.4.0
   animations: ^2.0.7
-  carousel_slider: ^4.2.1
+  smooth_page_indicator: ^1.1.0
 
   syncfusion_flutter_pdf: ^23.1.38
   syncfusion_flutter_calendar: ^23.1.38
@@ -61,7 +61,7 @@ dependencies:
   icalendar_parser: ^2.0.0
 
   background_fetch: ^1.2.1
-
+  flutter_local_notifications: ^16.1.0
 
 dev_dependencies:
   isar_generator: ^3.0.5
