@@ -33,135 +33,6 @@ class StundenplanPage extends StatefulWidget {
 }
 
 class _StundenplanPageState extends State<StundenplanPage> {
-  void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe) async {
-    await widget.isar.writeTxn(() async {
-      await widget.isar.stundes.clear();
-      await widget.isar.stundes.putAll(stunden);
-    });
-    await prefs.setString("stundenplanStufe", stufe);
-    await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
-    setState(() {});
-    try {
-      await updateStundenplan(widget.isar);
-      widget.calendarLoading.value = false;
-      print("updated stundenplan");
-    } catch (e) {
-      if (kDebugMode) print(e);
-    }
-    setState(() {});
-  }
-
-  void showStundenplanSelection(List<Stunde> stunden, String stufe) {
-    CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
-    Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
-    Navigator.push(context, MaterialPageRoute(builder: (context) {
-      CalendarController calendarController = CalendarController();
-      bool flyby = false;
-      bool visitedFriday = false;
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text("Wähle deine Kurse"),
-            ),
-            body: SfCalendar(
-              initialDisplayDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1)),
-              view: CalendarView.day,
-              controller: calendarController,
-              onViewChanged: (viewChangedDetails) {
-                if (viewChangedDetails.visibleDates.first.weekday == 5) {
-                  setState(() {
-                    visitedFriday = true;
-                  });
-                }
-                if (flyby) return;
-                if (viewChangedDetails.visibleDates.first.weekday == 6) {
-                  flyby = true;
-                  calendarController.forward!();
-                  calendarController.forward!();
-                  flyby = false;
-                }
-                if (viewChangedDetails.visibleDates.first.weekday == 7) {
-                  flyby = true;
-                  calendarController.backward!();
-                  calendarController.backward!();
-                  flyby = false;
-                }
-              },
-              dataSource: dataTableSource,
-              allowViewNavigation: false,
-              showCurrentTimeIndicator: false,
-              showTodayButton: false,
-              showWeekNumber: true,
-              appointmentBuilder: (context, calendarAppointmentDetails) {
-                Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
-                bool? active = activeStunden[stunden.firstWhere((element) => element.name == appointment.subject)];
-                if (active == null) throw StateError("couldnt find active Stunde");
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    List<Stunde> stundenToActivate = stunden.where((element) => element.name == appointment.subject).toList();
-                    for (Stunde stunde in stundenToActivate) {
-                      activeStunden[stunde] = !active;
-                    }
-                  }),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                        ),
-                        color: active ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface,
-                        borderRadius: const BorderRadius.all(Radius.circular(4))),
-                    width: calendarAppointmentDetails.bounds.width,
-                    height: calendarAppointmentDetails.bounds.height,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(1.0),
-                        child: Text(
-                          appointment.subject,
-                          style: TextStyle(),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-              timeSlotViewSettings: const TimeSlotViewSettings(
-                timeFormat: "HH",
-                startHour: 0,
-                endHour: 12,
-                timeIntervalHeight: 80,
-              ),
-              viewHeaderStyle: const ViewHeaderStyle(
-                dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
-              ),
-              minDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute)),
-              maxDate: DateTime.now()
-                  .add(Duration(days: min(5, max(0, 5 - DateTime.now().weekday)), hours: 23 - DateTime.now().hour, minutes: 59 - DateTime.now().minute))
-                  .add(const Duration(days: 7)),
-              selectionDecoration: const BoxDecoration(
-                color: Colors.transparent,
-                border: null,
-              ),
-            ),
-            floatingActionButton: AnimatedScale(
-              duration: const Duration(milliseconds: 300),
-              scale: visitedFriday ? 1 : 0,
-              child: FloatingActionButton.extended(
-                heroTag: null,
-                onPressed: () {
-                  setStundenplan((activeStunden..removeWhere((key, value) => !value)).keys.toList(), stufe, true);
-                  Navigator.of(context).pop();
-                },
-                icon: Icon(Ionicons.checkmark),
-                label: Text("Kursauswahl bestätigen"),
-              ),
-            ),
-          );
-        },
-      );
-    }));
-  }
 
   void addStundenplan() async {
     List<String> klassen = List.empty(growable: true);
@@ -194,11 +65,11 @@ class _StundenplanPageState extends State<StundenplanPage> {
                       } catch (e) {
                         if (kDebugMode) {
                           print(e);
+                        }
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text("Konnte Stundenpläne nicht abrufen: $e"),
                           ));
-                        }
                       }
                     }).call();
                     return const Padding(
@@ -223,7 +94,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
                               setState(() {
                                 loading = true;
                               });
-                              setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false);
+                              setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, widget.isar, prefs, () {
+                                setState(() {});
+                                widget.calendarLoading.value = false;
+                              });
                               Navigator.pop(context);
                             } else {
                               setState(() {
@@ -231,7 +105,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
                               });
                               List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
                               if (context.mounted) Navigator.pop(context);
-                              showStundenplanSelection(stunden, oberstufen[i - klassen.length]);
+                              showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, widget.isar, prefs, () {
+                                setState(() {});
+                                widget.calendarLoading.value = false;
+                              });
                             }
                           },
                         ),
@@ -487,6 +364,138 @@ class _StundenplanPageState extends State<StundenplanPage> {
       ),
     );
   }
+}
+
+
+void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+  await isar.writeTxn(() async {
+    await isar.stundes.clear();
+    await isar.stundes.putAll(stunden);
+  });
+  await prefs.setString("stundenplanStufe", stufe);
+  await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
+  refresh();
+  try {
+    await updateStundenplan(isar);
+    // print("updated stundenplan");
+  } catch (e) {
+    if (kDebugMode) print(e);
+  }
+  refresh();
+}
+
+Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+  CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
+  Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
+  var result = await Navigator.push(getContext(), MaterialPageRoute(builder: (context) {
+    CalendarController calendarController = CalendarController();
+    bool flyby = false;
+    bool visitedFriday = false;
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Wähle deine Kurse"),
+          ),
+          body: SfCalendar(
+            initialDisplayDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1)),
+            view: CalendarView.day,
+            controller: calendarController,
+            onViewChanged: (viewChangedDetails) {
+              if (viewChangedDetails.visibleDates.first.weekday == 5) {
+                setState(() {
+                  visitedFriday = true;
+                });
+              }
+              if (flyby) return;
+              if (viewChangedDetails.visibleDates.first.weekday == 6) {
+                flyby = true;
+                calendarController.forward!();
+                calendarController.forward!();
+                flyby = false;
+              }
+              if (viewChangedDetails.visibleDates.first.weekday == 7) {
+                flyby = true;
+                calendarController.backward!();
+                calendarController.backward!();
+                flyby = false;
+              }
+            },
+            dataSource: dataTableSource,
+            allowViewNavigation: false,
+            showCurrentTimeIndicator: false,
+            showTodayButton: false,
+            showWeekNumber: true,
+            appointmentBuilder: (context, calendarAppointmentDetails) {
+              Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
+              bool? active = activeStunden[stunden.firstWhere((element) => element.name == appointment.subject)];
+              if (active == null) throw StateError("couldnt find active Stunde");
+              return GestureDetector(
+                onTap: () => setState(() {
+                  List<Stunde> stundenToActivate = stunden.where((element) => element.name == appointment.subject).toList();
+                  for (Stunde stunde in stundenToActivate) {
+                    activeStunden[stunde] = !active;
+                  }
+                }),
+                child: Container(
+                  decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                      ),
+                      color: active ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface,
+                      borderRadius: const BorderRadius.all(Radius.circular(4))),
+                  width: calendarAppointmentDetails.bounds.width,
+                  height: calendarAppointmentDetails.bounds.height,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(1.0),
+                      child: Text(
+                        appointment.subject,
+                        style: TextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+            timeSlotViewSettings: const TimeSlotViewSettings(
+              timeFormat: "HH",
+              startHour: 0,
+              endHour: 12,
+              timeIntervalHeight: 80,
+            ),
+            viewHeaderStyle: const ViewHeaderStyle(
+              dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
+            ),
+            minDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute)),
+            maxDate: DateTime.now()
+                .add(Duration(days: min(5, max(0, 5 - DateTime.now().weekday)), hours: 23 - DateTime.now().hour, minutes: 59 - DateTime.now().minute))
+                .add(const Duration(days: 7)),
+            selectionDecoration: const BoxDecoration(
+              color: Colors.transparent,
+              border: null,
+            ),
+          ),
+          floatingActionButton: AnimatedScale(
+            duration: const Duration(milliseconds: 300),
+            scale: visitedFriday ? 1 : 0,
+            child: FloatingActionButton.extended(
+              heroTag: null,
+              onPressed: () {
+                setStundenplan((activeStunden..removeWhere((key, value) => !value)).keys.toList(), stufe, true, isar, prefs, refresh);
+                Navigator.of(context).pop(true);
+              },
+              icon: const Icon(Ionicons.checkmark),
+              label: const Text("Kursauswahl bestätigen"),
+            ),
+          ),
+        );
+      },
+    );
+  }));
+  if(result is bool) return result;
+  return false;
 }
 
 _AppointmentDataSource _getCalendarDataSource({required Isar isar, required SharedPreferences prefs, required String stufe, required bool isOberstufe}) {

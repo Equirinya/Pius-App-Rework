@@ -9,6 +9,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'connection.dart';
 import 'database.dart';
+import 'welcome.dart';
 import 'pages/settings.dart';
 import 'pages/stundenplan.dart';
 import 'pages/vertretungsplan.dart';
@@ -16,14 +17,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-//TODO über
+//TODO über +  add syncfusion as license
 //TODO carousel on first startup
 //TODO syncfusion
-
-//FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-//         FlutterLocalNotificationsPlugin();
-// flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-//     AndroidFlutterLocalNotificationsPlugin>().requestNotificationsPermission();
+//TODO Release build configuration https://pub.dev/packages/flutter_local_notifications#release-build-configuration
+//TODO home screen widgets
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -127,7 +125,7 @@ class _MyAppState extends State<MyApp> {
               extensions: [if(vertretungsColors != null) vertretungsColors],
             ),
             themeMode: ThemeMode.values[darkMode],
-            home: OuterPage(isar: widget.isar),
+            home:  (widget.prefs.getBool("initialized") ?? false) ? OuterPage(isar: widget.isar, prefs: widget.prefs) : WelcomeCarousel(isar: widget.isar),
           );
         },
       ),
@@ -178,35 +176,28 @@ class VertretungsColors extends ThemeExtension<VertretungsColors> {
 }
 
 class OuterPage extends StatefulWidget {
-  OuterPage({super.key, required this.isar});
+  const OuterPage({super.key, required this.isar, required this.prefs});
 
   final Isar isar;
+  final SharedPreferences prefs;
 
   @override
   State<OuterPage> createState() => _OuterPageState();
 }
 
 class _OuterPageState extends State<OuterPage> {
-  late SharedPreferences prefs;
-  bool initialized = false;
   ValueNotifier<bool?> vertretungsLoadingNotifier = ValueNotifier(false);
   ValueNotifier<bool?> calendarLoadingNotifier = ValueNotifier(false);
 
   @override
   void initState() {
-    SharedPreferences.getInstance().then((value) {
-      prefs = value;
-      initialized = true;
-      setState(() {
-        _selectedIndex = prefs.getInt("selectedPage") ?? 0;
-      });
-      Connectivity().checkConnectivity().then((value) {
-        if(!(prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
-          loadVertretungsplan();
-        }
-      });
-      loadCalendarContent();
+    _selectedIndex = widget.prefs.getInt("selectedPage") ?? 0;
+    Connectivity().checkConnectivity().then((value) {
+      if(!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+        loadVertretungsplan();
+      }
     });
+    loadCalendarContent();
     super.initState();
   }
 
@@ -223,16 +214,16 @@ class _OuterPageState extends State<OuterPage> {
   }
 
   void loadCalendarContent() async {
-    bool shouldUpdateTermine = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("termineUpdateDuration") ?? 8)));
-    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(prefs.getInt("stundenplanUpdateDuration") ?? 8)));
+    bool shouldUpdateTermine = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
+    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
     if(shouldUpdateTermine || shouldUpdateStundenplan){
       calendarLoadingNotifier.value = true;
       bool failed = false;
-      if(shouldUpdateTermine && (!(prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if(shouldUpdateTermine && (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
         // print("Updating Termine");
         try{
           await updateTermine();
-          prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
+          widget.prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
         }
         on Exception catch (e){
           if (kDebugMode) {
@@ -241,11 +232,11 @@ class _OuterPageState extends State<OuterPage> {
           failed = true;
         }
       }
-      if(shouldUpdateStundenplan && (!(prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if(shouldUpdateStundenplan && (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
         // print("Updating Stundenplan");
         try{
           await updateStundenplan(widget.isar);
-          prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);
+          widget.prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);
         }
         on Exception catch (e){
           if (kDebugMode) {
@@ -262,7 +253,6 @@ class _OuterPageState extends State<OuterPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!initialized) return const Center(child: CircularProgressIndicator());
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -271,7 +261,7 @@ class _OuterPageState extends State<OuterPage> {
           VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
           SettingsPage(isar: widget.isar, refresh: (){
             Connectivity().checkConnectivity().then((value) {
-              if(!(prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+              if(!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
                 loadVertretungsplan();
               }
             });
@@ -284,7 +274,7 @@ class _OuterPageState extends State<OuterPage> {
         onDestinationSelected: (index) {
           setState(() {
             _selectedIndex = index;
-            prefs.setInt("selectedPage", index);
+            widget.prefs.setInt("selectedPage", index);
           });
         },
         destinations: const [
