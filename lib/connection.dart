@@ -130,7 +130,6 @@ Future<void> updateStundenplan(Isar isar) async {
 
   int lastUpdate = prefs.getInt("stundenplanLastUpdate") ?? 0;
 
-
   List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
   List<DateTime> existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
   print("existingGueltigAb: ${existingGueltigAb.length}");
