@@ -46,7 +46,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
               title: const Text("Klasse/Stufe auswählen"),
               icon: const Icon(Ionicons.options_outline),
               content: StatefulBuilder(
-                builder: (context, setState) {
+                builder: (context, listSetState) {
                   if (stufen.isEmpty) {
                     (() async {
                       try {
@@ -57,7 +57,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
                         klassen = await compute(getStufen, klassenplan);
                         oberstufen = await compute(getStufen, oberstufenplan);
                         if (context.mounted) {
-                          setState(() {
+                          listSetState(() {
                             stufen.addAll(klassen);
                             stufen.addAll(oberstufen);
                           });
@@ -91,16 +91,16 @@ class _StundenplanPageState extends State<StundenplanPage> {
                           title: Text(stufen[i]),
                           onTap: () async {
                             if (i < klassen.length) {
-                              setState(() {
+                              listSetState(() {
                                 loading = true;
                               });
                               setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, widget.isar, prefs, () {
                                 setState(() {});
                                 widget.calendarLoading.value = false;
                               });
-                              Navigator.pop(context);
+                              if (context.mounted) Navigator.pop(context);
                             } else {
-                              setState(() {
+                              listSetState(() {
                                 loading = true;
                               });
                               List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
@@ -376,8 +376,9 @@ void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar i
   await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
   refresh();
   try {
+    await Future.delayed(const Duration(seconds: 10));
     await updateStundenplan(isar);
-    // print("updated stundenplan");
+    print("updated stundenplan");
   } catch (e) {
     if (kDebugMode) print(e);
   }
