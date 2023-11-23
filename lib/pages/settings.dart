@@ -41,9 +41,6 @@ Map<String, Duration> durations = {
 
 const List<(int, int)> stundenZeiten = [(7, 55), (8, 40), (9, 45), (10, 35), (11, 25), (12, 40), (13, 25), (14, 30), (15, 15), (16, 00), (16, 45)]; //TODO make editable
 
-//STundenzeiten
-//anzeigen der pius termine
-
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key, required this.isar, required this.refresh}) : super(key: key);
 
@@ -441,7 +438,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   Ionicons.information_circle,
                   "ueber",
                   SettingType.flutterAbout,
-                  "Entwicklung Pius-Logo: Benedikt Seidl"
+                  "Entwickelt von: Jacob Peters\nPius-Logo: Benedikt Seidl"
                 ),
               ]
             ),

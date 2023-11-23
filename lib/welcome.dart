@@ -132,8 +132,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text("Mach die App dein eigen"),
-                  ), //TODO
+                    child: Text("Let's go!"),
+                  ),
                 ),
               ),
             ),

@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
            xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission
+        android:name="android.permission.INTERNET"/>
     <application
         tools:replace="android:label"
         android:label="Pius App"
@@ -34,4 +36,6 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
+
 </manifest>

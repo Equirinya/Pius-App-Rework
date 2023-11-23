@@ -18,7 +18,6 @@ import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 //TODO über +  add syncfusion as license
-//TODO carousel on first startup
 //TODO syncfusion
 //TODO Release build configuration https://pub.dev/packages/flutter_local_notifications#release-build-configuration
 //TODO home screen widgets
@@ -214,7 +213,7 @@ class _OuterPageState extends State<OuterPage> {
   }
 
   void loadCalendarContent() async {
-    bool shouldUpdateTermine = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
+    bool shouldUpdateTermine = true || DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
     bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
     if(shouldUpdateTermine || shouldUpdateStundenplan){
       calendarLoadingNotifier.value = true;
