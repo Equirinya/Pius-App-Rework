@@ -38,10 +38,11 @@ Future<List<Appointment>> getPiusTermine() async {
         DateTime startTime = DateTime.parse((e["dtstart"] as IcsDateTime).dt);
         DateTime endTime = DateTime.parse((e["dtend"] as IcsDateTime).dt);
         bool isAllDay = (startTime.hour == 0 && startTime.minute == 0 && endTime.hour == 0 && endTime.hour == 0);
+        String subject = e["summary"];
         return Appointment(
           startTime: startTime,
           endTime: isAllDay ? endTime.subtract(const Duration(seconds: 1)) : endTime,
-          subject: e["summary"],
+          subject: utf8.decode(subject.codeUnits),
           isAllDay: isAllDay,
         );
       })
@@ -132,14 +133,18 @@ Future<void> updateStundenplan(Isar isar) async {
 
   List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
   List<DateTime> existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
-  print("existingGueltigAb: ${existingGueltigAb.length}");
+  DateTime newestExisting = existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value);
   List<DateTime> neueGueltigAb = stundenplaene.map((e) => e.$1).toList();
 
   List<DateTime> toDelete = existingGueltigAb.where((element) => !neueGueltigAb.contains(element)).toList();
-  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> toAdd = stundenplaene.where((element) => !existingGueltigAb.contains(element.$1)).toList();
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> toAdd = stundenplaene.where((element) => !existingGueltigAb.contains(element.$1) && (element.$1.millisecondsSinceEpoch >= newestExisting.millisecondsSinceEpoch)).toList();
 
   List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stayedSame = stundenplaene.where((element) => existingGueltigAb.contains(element.$1)).toList();
   stayedSame.retainWhere((element) => element.$2.millisecondsSinceEpoch > lastUpdate);
+  if(stayedSame.isNotEmpty){ //wenn ein Stundenplan gleiches gültig ab aber anders stand ab hat, dann werden dieser und alle neueren neu eingefügt
+    DateTime newestStayedSame = stayedSame.map((e) => e.$1).reduce((value, element) => value.isBefore(element) ? element : value);
+    stayedSame = stundenplaene.where((element) => existingGueltigAb.contains(element.$1) && element.$1.millisecondsSinceEpoch >= newestStayedSame.millisecondsSinceEpoch).toList();
+  }
   // print("stayed same. ${stayedSame.length}");
   // print("to delete. ${toDelete.length}");
   // print("to add. ${toAdd.length}");
