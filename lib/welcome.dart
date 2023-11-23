@@ -2,12 +2,12 @@ import 'dart:math';
 
 import 'package:PiusApp/connection.dart';
 import 'package:PiusApp/main.dart';
+import 'package:PiusApp/pages/settings.dart';
 import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:PiusApp/database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar/isar.dart';
@@ -377,63 +377,67 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
           ),
         ),
       if (loggedIn && courseSelected)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 32, bottom: 16),
-                child: Icon(Ionicons.notifications_outline, size: 48, color: Theme.of(context).colorScheme.primary),
-              ),
-              Text("Benachrichtigungen", style: Theme.of(context).textTheme.headlineLarge),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text("Möchtest du Benachrichtigungen zu neuen Vertretungen erhalten? Du kannst diese Einstellung später in den Einstellungen ändern.",
-                    style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-              ),
-              const Expanded(child: SizedBox()),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  OutlinedButton(
-                    onPressed: () {
-                      prefs.setBool("showNotifications", false);
-                      prefs.setBool("initialized", true);
-                      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: SizedBox(width: 48, child: Text("Nein", textAlign: TextAlign.center)),
-                    ),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () {
-                      FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-                      flutterLocalNotificationsPlugin
-                          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-                          ?.requestNotificationsPermission();
-                      //TODO IOS permission?
-                      prefs.setBool("showNotifications", true);
-                      prefs.setBool("initialized", true);
-                      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: SizedBox(
-                        width: 48,
-                        child: Text("Ja", textAlign: TextAlign.center),
+        Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 32, bottom: 16),
+                  child: Icon(Ionicons.notifications_outline, size: 48, color: Theme.of(context).colorScheme.primary),
+                ),
+                Text("Benachrichtigungen", style: Theme.of(context).textTheme.headlineLarge),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text("Möchtest du Benachrichtigungen zu neuen Vertretungen erhalten? Du kannst diese Einstellung später in den Einstellungen ändern.",
+                      style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
+                ),
+                const Expanded(child: SizedBox()),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () {
+                        prefs.setBool("showNotifications", false);
+                        prefs.setBool("initialized", true);
+                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: SizedBox(width: 48, child: Text("Nein", textAlign: TextAlign.center)),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(
-                height: 16,
-              )
-            ],
+                    FilledButton.tonal(
+                      onPressed: () async {
+                        bool gotPermission = await requestNotificationPermission();
+                        if(!gotPermission) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text("Konnte keine Benachrichtigungen aktivieren."),
+                          ));
+                          return;
+                        }
+                        prefs.setBool("showNotifications", true);
+                        prefs.setBool("initialized", true);
+                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: SizedBox(
+                          width: 48,
+                          child: Text("Ja", textAlign: TextAlign.center),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(
+                  height: 16,
+                )
+              ],
+            ),
           ),
-        ),
+        )
     ];
 
     return Material(

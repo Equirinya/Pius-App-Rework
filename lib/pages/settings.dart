@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
+import 'dart:math';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
@@ -15,16 +18,19 @@ import '../connection.dart';
 import 'vertretungsplan.dart';
 
 enum SettingType {
-  bool, //default value false
-  boolDefaultTrue, //default value false
-  selection,
-  selectionWithConfirm,
-  customTap,
-  custom,
-  flutterAbout,
-  text,
-  string
+  bool, //default value false, extra is null
+  boolDefaultTrue, //extra is null
+  boolWithCallback, //extra is (defaultValue, callback(bool))
+  selection, //extra is (List<String> options, fallbackIndex)
+  selectionWithCallback, //extra is (List<String> options, fallbackIndex, callback)
+  customTap, //extra is VoidCallback
+  custom, //extra is custom Widget
+  flutterAbout, //extra is License String
+  text, //extra is null
+  string //extra is fallback
 }
+
+Random random = Random();
 
 Map<String, Duration> durations = {
   "15 Minuten": const Duration(minutes: 15),
@@ -39,7 +45,41 @@ Map<String, Duration> durations = {
   "1 Woche": const Duration(days: 7),
 };
 
-const List<(int, int)> stundenZeiten = [(7, 55), (8, 40), (9, 45), (10, 35), (11, 25), (12, 40), (13, 25), (14, 30), (15, 15), (16, 00), (16, 45)]; //TODO make editable
+const List<(int, int)> stundenZeiten = [
+  (7, 55),
+  (8, 40),
+  (9, 45),
+  (10, 35),
+  (11, 25),
+  (12, 40),
+  (13, 25),
+  (14, 30),
+  (15, 15),
+  (16, 00),
+  (16, 45)
+]; //TODO make editable
+
+Future<bool> requestNotificationPermission() async {
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  bool? result;
+  if (Platform.isAndroid) {
+    result =
+        await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+  } else if (Platform.isIOS) {
+    result = await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+  } else if (Platform.isMacOS) {
+    result = await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+  }
+  return result ?? false;
+}
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key, required this.isar, required this.refresh}) : super(key: key);
@@ -236,8 +276,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     "Zeige Benachrichtigungen passend zu deinen Kursen",
                     Ionicons.notifications,
                     "showNotifications",
-                    SettingType.boolDefaultTrue,
-                    null
+                    SettingType.boolWithCallback,
+                    (true, (value) {
+                      if(value) requestNotificationPermission();
+                    })
                   ),
                 ]
               ),
@@ -304,7 +346,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   "System, Light oder Dark Mode?",
                   Ionicons.moon_outline,
                   "darkMode",
-                  SettingType.selectionWithConfirm,
+                  SettingType.selectionWithCallback,
                   (["System", "Light", "Dark"], 0, () => ColorChangedNotification().dispatch(context))
                 ),
               ]
@@ -328,35 +370,35 @@ class _SettingsPageState extends State<SettingsPage> {
                   null
                 ),
                 (
-                "Zeige Feiertage",
-                "Zeige die offiziellen NRW Feiertage im Stundenplan",
-                Ionicons.briefcase_outline,
-                "showFeiertage",
-                SettingType.boolDefaultTrue,
-                null
+                  "Zeige Feiertage",
+                  "Zeige die offiziellen NRW Feiertage im Stundenplan",
+                  Ionicons.briefcase_outline,
+                  "showFeiertage",
+                  SettingType.boolDefaultTrue,
+                  null
                 ),
               ]
             ),
             (
-            "unterrichtsfreie Zeiten",
-            [
-              (
-              "Pius-Termine unterrichtsfrei",
-              "Lese unterrichtsfreie Tage und Stunden aus den Terminen des Pius Kalenders aus",
-              Ionicons.newspaper_outline,
-              "termineFrei",
-              SettingType.boolDefaultTrue,
-              null
-              ),
-              (
-              "Feiertage als unterrichtsfrei",
-              "Zeige keinen Unterricht an den offiziellen NRW Feiertagen",
-              Ionicons.briefcase_outline,
-              "feiertageFrei",
-              SettingType.boolDefaultTrue,
-              null
-              ),
-            ]
+              "unterrichtsfreie Zeiten",
+              [
+                (
+                  "Pius-Termine unterrichtsfrei",
+                  "Lese unterrichtsfreie Tage und Stunden aus den Terminen des Pius Kalenders aus",
+                  Ionicons.newspaper_outline,
+                  "termineFrei",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+                (
+                  "Feiertage als unterrichtsfrei",
+                  "Zeige keinen Unterricht an den offiziellen NRW Feiertagen",
+                  Ionicons.briefcase_outline,
+                  "feiertageFrei",
+                  SettingType.boolDefaultTrue,
+                  null
+                ),
+              ]
             ),
           ]
         ),
@@ -534,18 +576,21 @@ class _SettingsPageState extends State<SettingsPage> {
                                                                   ));
                                                         }).then((value) => setState(() {})));
                                               case SettingType.boolDefaultTrue:
+                                              case SettingType.boolWithCallback:
                                               case SettingType.bool:
+                                                bool fallback = type == SettingType.boolDefaultTrue || (type == SettingType.boolWithCallback && extra.$1);
                                                 return SwitchListTile(
                                                   title: Text(title),
                                                   subtitle: subtitle != null ? Text(subtitle) : null,
                                                   secondary: Icon(icon),
-                                                  value: prefs.getBool(setting) ?? (type == SettingType.boolDefaultTrue),
+                                                  value: prefs.getBool(setting) ?? fallback,
                                                   onChanged: (value) {
                                                     prefs.setBool(setting, value);
+                                                    if(type == SettingType.boolWithCallback) extra.$2(value);
                                                     setState(() {});
                                                   },
                                                 );
-                                              case SettingType.selectionWithConfirm:
+                                              case SettingType.selectionWithCallback:
                                               case SettingType.selection:
                                                 List<String> options = List<String>.from(extra.$1);
                                                 int fallbackIndex = extra.$2;
@@ -588,7 +633,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                                           onPressed: () {
                                                                             Navigator.of(context).pop();
                                                                             prefs.setInt(setting, index);
-                                                                            if (type == SettingType.selectionWithConfirm) {
+                                                                            if (type == SettingType.selectionWithCallback) {
                                                                               extra.$3();
                                                                             }
                                                                           },

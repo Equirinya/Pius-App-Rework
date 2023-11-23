@@ -4,6 +4,7 @@ import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -35,6 +36,17 @@ void main() async {
   if (kDebugMode) {
     timeDilation = 1.0;
   }
+
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+// initialise the plugin. app_icon needs to be a added as a drawable resource to the Android head project
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
+  const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
+    requestSoundPermission: false,
+    requestBadgePermission: false,
+    requestAlertPermission: false,);
+  const InitializationSettings initializationSettings =
+      InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   runApp(MyApp(
     isar: isar,
@@ -116,15 +128,15 @@ class _MyAppState extends State<MyApp> {
             theme: ThemeData(
               useMaterial3: true,
               colorScheme: lightColorScheme,
-              extensions: [if(vertretungsColors != null) vertretungsColors],
+              extensions: [if (vertretungsColors != null) vertretungsColors],
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
               colorScheme: darkColorScheme,
-              extensions: [if(vertretungsColors != null) vertretungsColors],
+              extensions: [if (vertretungsColors != null) vertretungsColors],
             ),
             themeMode: ThemeMode.values[darkMode],
-            home:  (widget.prefs.getBool("initialized") ?? false) ? OuterPage(isar: widget.isar, prefs: widget.prefs) : WelcomeCarousel(isar: widget.isar),
+            home: (widget.prefs.getBool("initialized") ?? false) ? OuterPage(isar: widget.isar, prefs: widget.prefs) : WelcomeCarousel(isar: widget.isar),
           );
         },
       ),
@@ -192,7 +204,7 @@ class _OuterPageState extends State<OuterPage> {
   void initState() {
     _selectedIndex = widget.prefs.getInt("selectedPage") ?? 0;
     Connectivity().checkConnectivity().then((value) {
-      if(!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+      if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? false) || value == ConnectivityResult.wifi) {
         loadVertretungsplan();
       }
     });
@@ -201,43 +213,45 @@ class _OuterPageState extends State<OuterPage> {
   }
 
   void loadVertretungsplan() async {
-      vertretungsLoadingNotifier.value = true;
-      try {
-        String vertretungsplanWebsite = await getVertretungsplanWebsite();
-        await parseVertretungsplan(vertretungsplanWebsite, widget.isar);
-        vertretungsLoadingNotifier.value = false;
-      }
-      on Exception {
-        vertretungsLoadingNotifier.value = null;
-      }
+    vertretungsLoadingNotifier.value = true;
+    try {
+      String vertretungsplanWebsite = await getVertretungsplanWebsite();
+      await parseVertretungsplan(vertretungsplanWebsite, widget.isar);
+      vertretungsLoadingNotifier.value = false;
+    } on Exception {
+      vertretungsLoadingNotifier.value = null;
+    }
   }
 
   void loadCalendarContent() async {
-    bool shouldUpdateTermine = true || DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
-    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0).isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
-    if(shouldUpdateTermine || shouldUpdateStundenplan){
+    bool shouldUpdateTermine = true ||
+        DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0)
+            .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
+    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
+        .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
+    if (shouldUpdateTermine || shouldUpdateStundenplan) {
       calendarLoadingNotifier.value = true;
       bool failed = false;
-      if(shouldUpdateTermine && (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if (shouldUpdateTermine &&
+          (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
         // print("Updating Termine");
-        try{
+        try {
           await updateTermine();
           widget.prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
-        }
-        on Exception catch (e){
+        } on Exception catch (e) {
           if (kDebugMode) {
             print(e);
           }
           failed = true;
         }
       }
-      if(shouldUpdateStundenplan && (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if (shouldUpdateStundenplan &&
+          (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
         // print("Updating Stundenplan");
-        try{
+        try {
           await updateStundenplan(widget.isar);
           widget.prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);
-        }
-        on Exception catch (e){
+        } on Exception catch (e) {
           if (kDebugMode) {
             print(e);
           }
@@ -256,16 +270,22 @@ class _OuterPageState extends State<OuterPage> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          StundenplanPage(isar: widget.isar, vertretungsLoading: vertretungsLoadingNotifier, calendarLoading: calendarLoadingNotifier,),
+          StundenplanPage(
+            isar: widget.isar,
+            vertretungsLoading: vertretungsLoadingNotifier,
+            calendarLoading: calendarLoadingNotifier,
+          ),
           VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
-          SettingsPage(isar: widget.isar, refresh: (){
-            Connectivity().checkConnectivity().then((value) {
-              if(!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
-                loadVertretungsplan();
-              }
-            });
-            loadCalendarContent();
-          }),
+          SettingsPage(
+              isar: widget.isar,
+              refresh: () {
+                Connectivity().checkConnectivity().then((value) {
+                  if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+                    loadVertretungsplan();
+                  }
+                });
+                loadCalendarContent();
+              }),
         ],
       ),
       bottomNavigationBar: NavigationBar(

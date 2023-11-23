@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:PiusApp/pages/settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -25,6 +28,19 @@ const String termineUrl = baseUrl + "/pius-kalender.ics";
 const String feiertagUrl = "https://get.api-feiertage.de/?states=nw";
 
 class ColorChangedNotification extends Notification {}
+
+void showNotification(String title, String body) async {
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  const AndroidNotificationDetails androidNotificationDetails = AndroidNotificationDetails('new', 'Neue Vertretungen',
+      channelDescription: 'Neue Vertretungen seit dem letzten Update', importance: Importance.high, priority: Priority.high, groupKey: "new", setAsGroupSummary: true);
+  const DarwinNotificationDetails darwinPlatformChannelSpecifics = DarwinNotificationDetails(threadIdentifier: 'new');
+
+  const NotificationDetails notificationDetails =
+      NotificationDetails(android: androidNotificationDetails, iOS: darwinPlatformChannelSpecifics, macOS: darwinPlatformChannelSpecifics);
+
+  await flutterLocalNotificationsPlugin.show(random.nextInt((pow(2, 31) - 1).toInt()), title, body, notificationDetails);
+}
 
 Future<List<Appointment>> getPiusTermine() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -55,8 +71,7 @@ Future<List<Appointment>> getFeiertagTermine() async {
   http.Response response = await http.get(Uri.parse(feiertagUrl));
 
   if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode}");
-  List<Appointment> termine = List<Appointment>.from(jsonDecode(response.body)["feiertage"]
-      .map((e) {
+  List<Appointment> termine = List<Appointment>.from(jsonDecode(response.body)["feiertage"].map((e) {
     DateTime startTime = DateTime.parse(e["date"]);
     DateTime endTime = startTime.add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
     return Appointment(
@@ -137,13 +152,19 @@ Future<void> updateStundenplan(Isar isar) async {
   List<DateTime> neueGueltigAb = stundenplaene.map((e) => e.$1).toList();
 
   List<DateTime> toDelete = existingGueltigAb.where((element) => !neueGueltigAb.contains(element)).toList();
-  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> toAdd = stundenplaene.where((element) => !existingGueltigAb.contains(element.$1) && (element.$1.millisecondsSinceEpoch >= newestExisting.millisecondsSinceEpoch)).toList();
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> toAdd = stundenplaene
+      .where((element) => !existingGueltigAb.contains(element.$1) && (element.$1.millisecondsSinceEpoch >= newestExisting.millisecondsSinceEpoch))
+      .toList();
 
-  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stayedSame = stundenplaene.where((element) => existingGueltigAb.contains(element.$1)).toList();
+  List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stayedSame =
+      stundenplaene.where((element) => existingGueltigAb.contains(element.$1)).toList();
   stayedSame.retainWhere((element) => element.$2.millisecondsSinceEpoch > lastUpdate);
-  if(stayedSame.isNotEmpty){ //wenn ein Stundenplan gleiches gültig ab aber anders stand ab hat, dann werden dieser und alle neueren neu eingefügt
+  if (stayedSame.isNotEmpty) {
+    //wenn ein Stundenplan gleiches gültig ab aber anders stand ab hat, dann werden dieser und alle neueren neu eingefügt
     DateTime newestStayedSame = stayedSame.map((e) => e.$1).reduce((value, element) => value.isBefore(element) ? element : value);
-    stayedSame = stundenplaene.where((element) => existingGueltigAb.contains(element.$1) && element.$1.millisecondsSinceEpoch >= newestStayedSame.millisecondsSinceEpoch).toList();
+    stayedSame = stundenplaene
+        .where((element) => existingGueltigAb.contains(element.$1) && element.$1.millisecondsSinceEpoch >= newestStayedSame.millisecondsSinceEpoch)
+        .toList();
   }
   // print("stayed same. ${stayedSame.length}");
   // print("to delete. ${toDelete.length}");
@@ -161,10 +182,9 @@ Future<void> updateStundenplan(Isar isar) async {
   }
   existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
   for (var (DateTime gueltigAb, DateTime updated, bool oberstufe, String url) in toAdd) {
-
-    if(existingGueltigAb.isNotEmpty) {
+    if (existingGueltigAb.isNotEmpty) {
       List<Stunde> toUpdateStunden =
-      isar.stundes.filter().gueltigAbEqualTo(existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value)).findAllSync();
+          isar.stundes.filter().gueltigAbEqualTo(existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value)).findAllSync();
 
       await isar.writeTxn(() async {
         await isar.stundes.putAll(toUpdateStunden.map((e) => e..gueltigBis = gueltigAb).toList());
@@ -174,7 +194,7 @@ Future<void> updateStundenplan(Isar isar) async {
 
     List<Stunde> stunden = await compute(getStundenPlan, (stufe, PdfDocument(inputBytes: (await getSecuredPage(url)).bodyBytes), isOberstufe));
 
-    if(isOberstufe) stunden.retainWhere((element) => kurse.contains(element.name));
+    if (isOberstufe) stunden.retainWhere((element) => kurse.contains(element.name));
     await isar.writeTxn(() async {
       await isar.stundes.putAll(stunden);
     });
@@ -388,7 +408,7 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
   if (plan.body?.querySelector("h2")?.text == null || !plan.body!.querySelector("h2")!.text.startsWith("Ticker")) throw Exception("No ticker found");
   DOM.Element ticker = plan.body!.querySelector("h2")!;
   DOM.Element? tickerTextElement = ticker.nextElementSibling;
-  if(tickerTextElement != null) tickerTextElement.innerHtml = tickerTextElement.innerHtml.replaceAll("<br>", "\n");
+  if (tickerTextElement != null) tickerTextElement.innerHtml = tickerTextElement.innerHtml.replaceAll("<br>", "\n");
   String tickertext = tickerTextElement?.text ?? "";
   tickertext = tickertext.replaceAll("\n\n", "\n").trim();
   ticker.remove();
