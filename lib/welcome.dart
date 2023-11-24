@@ -1,8 +1,8 @@
 import 'dart:math';
 
+import 'package:PiusApp/background.dart';
 import 'package:PiusApp/connection.dart';
 import 'package:PiusApp/main.dart';
-import 'package:PiusApp/pages/settings.dart';
 import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:PiusApp/database.dart';
 import 'package:flutter/cupertino.dart';
@@ -402,6 +402,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                         prefs.setBool("showNotifications", false);
                         prefs.setBool("initialized", true);
                         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+                        configureBackgroundFetch();
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(16.0),
@@ -419,6 +420,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                         }
                         prefs.setBool("showNotifications", true);
                         prefs.setBool("initialized", true);
+                        configureBackgroundFetch();
                         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
                       },
                       child: const Padding(

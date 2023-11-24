@@ -1,10 +1,10 @@
-import 'dart:io' show Platform;
 import 'dart:math';
+import 'package:PiusApp/background.dart';
+import 'package:app_settings/app_settings.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../connection.dart';
 import 'vertretungsplan.dart';
 
+//TODO rework from enum to Objects
 enum SettingType {
   bool, //default value false, extra is null
   boolDefaultTrue, //extra is null
@@ -58,28 +59,6 @@ const List<(int, int)> stundenZeiten = [
   (16, 00),
   (16, 45)
 ]; //TODO make editable
-
-Future<bool> requestNotificationPermission() async {
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  bool? result;
-  if (Platform.isAndroid) {
-    result =
-        await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
-  } else if (Platform.isIOS) {
-    result = await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-  } else if (Platform.isMacOS) {
-    result = await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-  }
-  return result ?? false;
-}
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key, required this.isar, required this.refresh}) : super(key: key);
@@ -246,24 +225,32 @@ class _SettingsPageState extends State<SettingsPage> {
                   "Aktualisiere den Vertretungsplan im Hintergrund",
                   Ionicons.refresh_outline,
                   "background",
-                  SettingType.boolDefaultTrue,
-                  null
+                  SettingType.boolWithCallback,
+                  (true, (value) {
+                      enableBackground(value);
+                    }
+                  )
                 ),
                 (
                   "Vertretungsplan Update Intervall",
                   "Der Vertretungsplan wird im Hintergrund nach diesem Intervall aktualisiert",
                   Ionicons.refresh_circle_outline,
                   "vertretungUpdateDuration",
-                  SettingType.selection,
-                  (durations.keys.toList(), 3),
+                  SettingType.selectionWithCallback,
+                  (durations.keys.toList(), 2, () {
+                    configureBackgroundFetch();
+                  }),
                 ),
                 (
                   "Vertretungsplan Update Wifi Only",
                   "Aktualisiere Vertretungsplan nur bei WLAN Verbindung.",
                   Ionicons.wifi_outline,
                   "vertretungUpdateWifi",
-                  SettingType.bool,
-                  null,
+                SettingType.boolWithCallback,
+                (false, (value) {
+                  configureBackgroundFetch();
+                }
+                )
                 ),
               ]
             ),
@@ -277,10 +264,21 @@ class _SettingsPageState extends State<SettingsPage> {
                     Ionicons.notifications,
                     "showNotifications",
                     SettingType.boolWithCallback,
-                    (true, (value) {
-                      if(value) requestNotificationPermission();
-                    })
+                    (
+                      true,
+                      (value) {
+                        if (value) requestNotificationPermission();
+                      }
+                    )
                   ),
+                  (
+                    "Ändere Benachrichtigungseinstellungen",
+                    "Ändere Ton, Vibration, etc.",
+                    Ionicons.settings_outline,
+                    "",
+                    SettingType.customTap,
+                    () => AppSettings.openAppSettings(type: AppSettingsType.notification),
+                  )
                 ]
               ),
             (
@@ -358,6 +356,19 @@ class _SettingsPageState extends State<SettingsPage> {
           "Anpassungen der Stundenplan Ansicht",
           Ionicons.calendar_outline,
           [
+            (
+            "Klasse/Kurs",
+            [
+              (
+              "Ändere Klasse/Kurs",
+              "Ändere die Klasse/den Kurs des Stundenplans",
+              Ionicons.calendar_outline,
+              "",
+              SettingType.customTap,
+              () => print("TODO") //TODO
+              ),
+            ]
+            ),
             (
               "Inhalt",
               [
@@ -586,7 +597,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                   value: prefs.getBool(setting) ?? fallback,
                                                   onChanged: (value) {
                                                     prefs.setBool(setting, value);
-                                                    if(type == SettingType.boolWithCallback) extra.$2(value);
+                                                    if (type == SettingType.boolWithCallback) extra.$2(value);
                                                     setState(() {});
                                                   },
                                                 );

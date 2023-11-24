@@ -29,19 +29,6 @@ const String feiertagUrl = "https://get.api-feiertage.de/?states=nw";
 
 class ColorChangedNotification extends Notification {}
 
-void showNotification(String title, String body) async {
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-  const AndroidNotificationDetails androidNotificationDetails = AndroidNotificationDetails('new', 'Neue Vertretungen',
-      channelDescription: 'Neue Vertretungen seit dem letzten Update', importance: Importance.high, priority: Priority.high, groupKey: "new", setAsGroupSummary: true);
-  const DarwinNotificationDetails darwinPlatformChannelSpecifics = DarwinNotificationDetails(threadIdentifier: 'new');
-
-  const NotificationDetails notificationDetails =
-      NotificationDetails(android: androidNotificationDetails, iOS: darwinPlatformChannelSpecifics, macOS: darwinPlatformChannelSpecifics);
-
-  await flutterLocalNotificationsPlugin.show(random.nextInt((pow(2, 31) - 1).toInt()), title, body, notificationDetails);
-}
-
 Future<List<Appointment>> getPiusTermine() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   http.Response response = await http.get(Uri.parse(prefs.getString("website_url_termine") ?? termineUrl));
@@ -160,7 +147,7 @@ Future<void> updateStundenplan(Isar isar) async {
       stundenplaene.where((element) => existingGueltigAb.contains(element.$1)).toList();
   stayedSame.retainWhere((element) => element.$2.millisecondsSinceEpoch > lastUpdate);
   if (stayedSame.isNotEmpty) {
-    //wenn ein Stundenplan gleiches gültig ab aber anders stand ab hat, dann werden dieser und alle neueren neu eingefügt
+    //wenn ein Stundenplan gleiches "gültig ab" aber anderes "stand ab" hat, dann werden dieser und alle neueren neu eingefügt
     DateTime newestStayedSame = stayedSame.map((e) => e.$1).reduce((value, element) => value.isBefore(element) ? element : value);
     stayedSame = stundenplaene
         .where((element) => existingGueltigAb.contains(element.$1) && element.$1.millisecondsSinceEpoch >= newestStayedSame.millisecondsSinceEpoch)

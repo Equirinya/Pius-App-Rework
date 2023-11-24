@@ -1,3 +1,4 @@
+import 'package:PiusApp/background.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
@@ -20,8 +21,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 //TODO über +  add syncfusion as license
 //TODO syncfusion
-//TODO Release build configuration https://pub.dev/packages/flutter_local_notifications#release-build-configuration
 //TODO home screen widgets
+
+//TODO Increment klasse nach sommerferien
+//TODO settings stundenplan
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +50,8 @@ void main() async {
   const InitializationSettings initializationSettings =
       InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  configureBackgroundFetch();
 
   runApp(MyApp(
     isar: isar,

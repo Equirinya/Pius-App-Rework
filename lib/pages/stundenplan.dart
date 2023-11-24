@@ -356,11 +356,11 @@ class _StundenplanPageState extends State<StundenplanPage> {
                 tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
                 label: Text("Klasse/Stufe auswählen"),
                 icon: const Icon(Ionicons.options_outline),
-              )
-            : FloatingActionButton(
-                onPressed: addStundenplan,
-                tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
-                child: const Icon(Ionicons.options_outline)),
+              ) : null
+            // : FloatingActionButton(
+            //     onPressed: addStundenplan,
+            //     tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
+            //     child: const Icon(Ionicons.options_outline)),
       ),
     );
   }
@@ -378,7 +378,7 @@ void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar i
   try {
     await Future.delayed(const Duration(seconds: 10));
     await updateStundenplan(isar);
-    print("updated stundenplan");
+    // print("updated stundenplan");
   } catch (e) {
     if (kDebugMode) print(e);
   }
