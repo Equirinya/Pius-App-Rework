@@ -239,7 +239,6 @@ class _OuterPageState extends State<OuterPage> {
       bool failed = false;
       if (shouldUpdateTermine &&
           (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
-        // print("Updating Termine");
         try {
           await updateTermine();
           widget.prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
@@ -252,7 +251,6 @@ class _OuterPageState extends State<OuterPage> {
       }
       if (shouldUpdateStundenplan &&
           (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
-        // print("Updating Stundenplan");
         try {
           await updateStundenplan(widget.isar);
           widget.prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);

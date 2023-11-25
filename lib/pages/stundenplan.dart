@@ -34,98 +34,10 @@ class StundenplanPage extends StatefulWidget {
 
 class _StundenplanPageState extends State<StundenplanPage> {
 
-  void addStundenplan() async {
-    List<String> klassen = List.empty(growable: true);
-    List<String> oberstufen = List.empty(growable: true);
-    List<String> stufen = List.empty(growable: true);
-    bool loading = false;
-    if (!context.mounted) return;
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: const Text("Klasse/Stufe auswählen"),
-              icon: const Icon(Ionicons.options_outline),
-              content: StatefulBuilder(
-                builder: (context, listSetState) {
-                  if (stufen.isEmpty) {
-                    (() async {
-                      try {
-                        final (_klassenplan, _oberstufenplan) = await getCurrentStundenplaene();
-                        klassenplan = _klassenplan;
-                        oberstufenplan = _oberstufenplan;
-
-                        klassen = await compute(getStufen, klassenplan);
-                        oberstufen = await compute(getStufen, oberstufenplan);
-                        if (context.mounted) {
-                          listSetState(() {
-                            stufen.addAll(klassen);
-                            stufen.addAll(oberstufen);
-                          });
-                        }
-                      } catch (e) {
-                        if (kDebugMode) {
-                          print(e);
-                        }
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                          ));
-                      }
-                    }).call();
-                    return const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CupertinoActivityIndicator(),
-                    );
-                  }
-                  if (loading) {
-                    return const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CupertinoActivityIndicator(),
-                    );
-                  }
-                  return SingleChildScrollView(
-                      child: Column(
-                    children: [
-                      for (int i = 0; i < stufen.length; i++)
-                        ListTile(
-                          title: Text(stufen[i]),
-                          onTap: () async {
-                            if (i < klassen.length) {
-                              listSetState(() {
-                                loading = true;
-                              });
-                              setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, widget.isar, prefs, () {
-                                setState(() {});
-                                widget.calendarLoading.value = false;
-                              });
-                              if (context.mounted) Navigator.pop(context);
-                            } else {
-                              listSetState(() {
-                                loading = true;
-                              });
-                              List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
-                              if (context.mounted) Navigator.pop(context);
-                              showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, widget.isar, prefs, () {
-                                setState(() {});
-                                widget.calendarLoading.value = false;
-                              });
-                            }
-                          },
-                        ),
-                    ],
-                  ));
-                },
-              ),
-              actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
-            ));
-  }
-
   late SharedPreferences prefs;
   bool initialized = false;
   bool? calendarLoading = false;
   bool? vertretungLoading = false;
-  late PdfDocument klassenplan;
-  late PdfDocument oberstufenplan;
 
   @override
   void initState() {
@@ -241,7 +153,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
                                                         fontSize: 12,
                                                       ),
                                                     ),
-                                                    SizedBox(
+                                                    const SizedBox(
                                                       height: 4,
                                                     ),
                                                     Text(
@@ -352,9 +264,12 @@ class _StundenplanPageState extends State<StundenplanPage> {
         ),
         floatingActionButton: emptyCalendar
             ? FloatingActionButton.extended(
-                onPressed: addStundenplan,
+                onPressed: () => addStundenplan(context, widget.isar, prefs,  () {
+                  setState(() {});
+                  widget.calendarLoading.value = false;
+                }),
                 tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
-                label: Text("Klasse/Stufe auswählen"),
+                label: const Text("Klasse/Stufe auswählen"),
                 icon: const Icon(Ionicons.options_outline),
               ) : null
             // : FloatingActionButton(
@@ -367,6 +282,86 @@ class _StundenplanPageState extends State<StundenplanPage> {
 }
 
 
+void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+  List<String> klassen = List.empty(growable: true);
+  List<String> oberstufen = List.empty(growable: true);
+  List<String> stufen = List.empty(growable: true);
+  bool loading = false;
+  PdfDocument? klassenplan;
+  PdfDocument? oberstufenplan;
+
+  showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Klasse/Stufe auswählen"),
+        icon: const Icon(Ionicons.options_outline),
+        content: StatefulBuilder(
+          builder: (context, listSetState) {
+            if (stufen.isEmpty) {
+              (() async {
+                try {
+                  (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
+
+                  klassen = await compute(getStufen, klassenplan);
+                  oberstufen = await compute(getStufen, oberstufenplan);
+                  if (context.mounted) {
+                    listSetState(() {
+                      stufen.addAll(klassen);
+                      stufen.addAll(oberstufen);
+                    });
+                  }
+                } catch (e) {
+                  if (kDebugMode) {
+                    print(e);
+                  }
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text("Konnte Stundenpläne nicht abrufen: $e"),
+                  ));
+                }
+              }).call();
+              return const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: CupertinoActivityIndicator(),
+              );
+            }
+            if (loading || klassenplan == null || oberstufenplan == null) {
+              return const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: CupertinoActivityIndicator(),
+              );
+            }
+            return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (int i = 0; i < stufen.length; i++)
+                      ListTile(
+                        title: Text(stufen[i]),
+                        onTap: () async {
+                          if (i < klassen.length) {
+                            listSetState(() {
+                              loading = true;
+                            });
+                            setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, isar, prefs, refresh);
+                            if (context.mounted) Navigator.pop(context);
+                          } else {
+                            listSetState(() {
+                              loading = true;
+                            });
+                            List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
+                            if (context.mounted) Navigator.pop(context);
+                            showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
+                          }
+                        },
+                      ),
+                  ],
+                ));
+          },
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
+      ));
+}
+
 void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
   await isar.writeTxn(() async {
     await isar.stundes.clear();
@@ -378,7 +373,6 @@ void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar i
   try {
     await Future.delayed(const Duration(seconds: 10));
     await updateStundenplan(isar);
-    // print("updated stundenplan");
   } catch (e) {
     if (kDebugMode) print(e);
   }
@@ -452,7 +446,7 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
                       padding: const EdgeInsets.all(1.0),
                       child: Text(
                         appointment.subject,
-                        style: TextStyle(),
+                        style: const TextStyle(),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -622,7 +616,6 @@ _AppointmentDataSource _getCalendarDataSourceFromStunden(
     final (int eStunde, int eMinute) = uhrzeiten[stunde.stunden.last];
 
     DateTime firstTime = getNextDateTimeWithWeekdayAndHour(stunde.gueltigAb, stunde.tag, uStunde, uMinute);
-    // print(weekNumber(firstTime));
     if ((weekNumber(firstTime) % 2 == 0) != stunde.geradeWoche) {
       firstTime = firstTime.add(const Duration(days: 7));
     }
@@ -726,7 +719,6 @@ class _AppointmentDataSource extends CalendarDataSource {
   }
   @override
   bool isAllDay(int index) {
-    print(appointments![index].isAllDay);
     return appointments![index].isAllDay;
   }
 }

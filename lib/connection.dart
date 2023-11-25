@@ -77,8 +77,6 @@ Future<void> updateTermine() async {
   List<Appointment> feiertagTermine = await getFeiertagTermine();
   String termineString = jsonEncode(termine.map((e) => appointmentToMap(e)).toList());
   String feiertagTermineString = jsonEncode(feiertagTermine.map((e) => appointmentToMap(e)).toList());
-  print(termineString);
-  print(feiertagTermineString);
   prefs.setString("piusTermine", termineString);
   prefs.setString("feiertagTermine", feiertagTermineString);
   return;
@@ -153,9 +151,6 @@ Future<void> updateStundenplan(Isar isar) async {
         .where((element) => existingGueltigAb.contains(element.$1) && element.$1.millisecondsSinceEpoch >= newestStayedSame.millisecondsSinceEpoch)
         .toList();
   }
-  // print("stayed same. ${stayedSame.length}");
-  // print("to delete. ${toDelete.length}");
-  // print("to add. ${toAdd.length}");
 
   toDelete.addAll(stayedSame.map((e) => e.$1));
   toAdd.addAll(stayedSame);
@@ -255,10 +250,6 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOber
   if (!lines[3].text.startsWith("ab ")) throw Exception("kein Startdatum gefunden");
   final europeanDateFormatter = DateFormat('dd.MM.yyyy');
   DateTime gueltigAb = europeanDateFormatter.parse(lines[3].text.substring(3));
-  // int i2= 0;
-  // while(i2<lines.length){
-  //   print(lines[i2].text);
-  //   i2++;
   // }
   for (bool gerade in [false, true]) {
     if (gerade && isOberstufe) {
@@ -276,7 +267,6 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOber
       double x = textWord.bounds.bottomCenter.dx;
       tageXAbstand.add(x);
     }
-    // print(tageXAbstand);
     index++;
     List<double> stundenYAbstand = List.empty(growable: true);
     while (lines[index].text.length <= 2 && int.tryParse(lines[index].text) != null && index < lines.length - 1) {
@@ -286,7 +276,6 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOber
       index++;
     }
 
-    // print(stundenYAbstand);
     List<double> stundenWithAveragesYAbstand = generateInBetweenAverages(stundenYAbstand);
     List<List<TextLine>> linesInDays = [for (int i = 0; i < tageXAbstand.length; i++) List.empty(growable: true)];
     while (!lines[index].text.contains("Kalenderwoche") && index < lines.length - 1) {
@@ -299,23 +288,17 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOber
     }
     List<TextLine> stundenInBlock = List.empty(growable: true);
     for (int tag = 0; tag < linesInDays.length; tag++) {
-      // print("tag $tag");
       for (int stunde = 0; stunde < linesInDays[tag].length; stunde++) {
-        // print(linesInDays[tag][stunde].text);
         if (stundenInBlock.isEmpty) {
           stundenInBlock.add(linesInDays[tag][stunde]);
         } else if (linesInDays[tag][stunde].bounds.centerRight.dy - stundenInBlock.last.bounds.centerRight.dy < linesInDays[tag][stunde].bounds.height) {
-          // print("${linesInDays[tag][stunde].text}"
-          //     " ${linesInDays[tag][stunde].bounds.centerRight.dy - stundenInBlock.last.bounds.centerRight.dy} < ${linesInDays[tag][stunde].bounds.height}");
           stundenInBlock.add(linesInDays[tag][stunde]);
         } else {
           double averageY = (stundenInBlock.first.bounds.centerRight.dy + stundenInBlock.last.bounds.centerRight.dy) / 2;
           int closestYMatch = findClosestMatchIndex(averageY, stundenWithAveragesYAbstand);
           List<int> stundenWhereBlockTakesPlace = closestYMatch % 2 == 0 ? [closestYMatch ~/ 2] : [closestYMatch ~/ 2, closestYMatch ~/ 2 + 1];
 
-          // print("finished Block:");
           for (TextLine textLine in stundenInBlock) {
-            // print(textLine.text);
             String text = textLine.text;
             stunden.add(Stunde()
               ..name = text
@@ -405,7 +388,6 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
   for (DOM.Element h2 in plan.body!.querySelectorAll("h2")) {
     final europeanDateFormatter = DateFormat('dd.MM.yyyy');
     DateTime datum = europeanDateFormatter.parse(h2.text.substring(h2.text.lastIndexOf(" ") + 1));
-    // print(datum);
     DOM.Element? letzteAktualisierung = h2.nextElementSibling;
     if (letzteAktualisierung == null || letzteAktualisierung.localName != "p" || !letzteAktualisierung.text.startsWith("(Letzte Aktualisierung"))
       throw Exception("No last update found");
@@ -425,7 +407,6 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
       List<DOM.Element> tds = tr.querySelectorAll("td");
       if (ths.length == 1) {
         stufe = ths[0].text;
-        // print(stufe);
         continue;
       }
       if (tds.length == 6) {
@@ -451,7 +432,6 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
           ..bemerkung = bemerkung
           ..tag = datum
           ..hervorgehoben = hervorgehoben);
-        // print("$stufe $stunden $art $kurs $raum $lehrkraft $bemerkung");
       }
       if (tds.length == 3) {
         if (tds[2].className != "eva auftrag") throw Exception("No eva found");

@@ -37,7 +37,6 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
     widget.loadingNotifier.addListener(() {
       setState(() {
         loading = widget.loadingNotifier.value;
-        // print("loading: $loading");
       });
     });
     super.initState();

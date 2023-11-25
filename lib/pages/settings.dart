@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:PiusApp/background.dart';
+import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
@@ -362,10 +363,10 @@ class _SettingsPageState extends State<SettingsPage> {
               (
               "Ändere Klasse/Kurs",
               "Ändere die Klasse/den Kurs des Stundenplans",
-              Ionicons.calendar_outline,
+              Ionicons.library_outline,
               "",
               SettingType.customTap,
-              () => print("TODO") //TODO
+              () => addStundenplan(context, widget.isar, prefs, () {})
               ),
             ]
             ),

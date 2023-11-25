@@ -12,7 +12,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _onBackgroundFetch(String taskId) async {
-  print("[BackgroundFetch] Event received $taskId");
 
   final Isar isar = Isar.getInstance() ??
       await Isar.open(
@@ -28,7 +27,9 @@ void _onBackgroundFetch(String taskId) async {
     String vertretungsplanWebsite = await getVertretungsplanWebsite();
     neueVertretungen = await parseVertretungsplan(vertretungsplanWebsite, isar);
   } on Exception {
-    print("Error while fetching Vertretungsplan");
+    if (kDebugMode) {
+      print("Error while fetching Vertretungsplan");
+    }
     return;
   }
 
@@ -149,12 +150,13 @@ Future<void> configureBackgroundFetch() async {
     _onBackgroundFetchTimeout,
   );
   BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
-  print('[BackgroundFetch] configure success: $status');
 }
 
 /// This event fires shortly before your task is about to timeout.  You must finish any outstanding work and call BackgroundFetch.finish(taskId).
 void _onBackgroundFetchTimeout(String taskId) {
-  print("[BackgroundFetch] TIMEOUT: $taskId");
+  if (kDebugMode) {
+    print("[BackgroundFetch] TIMEOUT: $taskId");
+  }
   BackgroundFetch.finish(taskId);
 }
 
@@ -167,11 +169,12 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
   if (isTimeout) {
     // This task has exceeded its allowed running-time.
     // You must stop what you're doing and immediately .finish(taskId)
-    print("[BackgroundFetch] Headless task timed-out: $taskId");
+    if (kDebugMode) {
+      print("[BackgroundFetch] Headless task timed-out: $taskId");
+    }
     BackgroundFetch.finish(taskId);
     return;
   }
-  print('[BackgroundFetch] Headless event received.');
   _onBackgroundFetch(taskId);
 }
 
@@ -181,16 +184,19 @@ void enableBackground(bool enable) async {
   if (enable) {
     configureBackgroundFetch();
     BackgroundFetch.start().then((int status) {
-      print('[BackgroundFetch] start success: $status');
     }).catchError((e) {
-      print('[BackgroundFetch] start FAILURE: $e');
+      if (kDebugMode) {
+        print('[BackgroundFetch] start FAILURE: $e');
+      }
     });
     if (prefs.getBool("showNotifications") ?? true) {
       requestNotificationPermission();
     }
   } else {
     BackgroundFetch.stop().then((int status) {
-      print('[BackgroundFetch] stop success: $status');
+      if (kDebugMode) {
+        print('[BackgroundFetch] stop success: $status');
+      }
     });
   }
 }
