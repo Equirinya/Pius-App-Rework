@@ -78,10 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   void initState() {
-    AndroidOptions getAndroidOptions() => const AndroidOptions(
-          encryptedSharedPreferences: true,
-        );
-    securePrefs = FlutterSecureStorage(aOptions: getAndroidOptions());
+    securePrefs = getSecurePrefs();
     SharedPreferences.getInstance().then((value) {
       prefs = value;
       initialized = true;

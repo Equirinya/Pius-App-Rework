@@ -515,10 +515,7 @@ Future<bool> checkCredentials() async {
 }
 
 Future<http.Response> getSecuredPage(String url) async {
-  AndroidOptions getAndroidOptions() => const AndroidOptions(
-        encryptedSharedPreferences: true,
-      );
-  final FlutterSecureStorage securePrefs = FlutterSecureStorage(aOptions: getAndroidOptions());
+  FlutterSecureStorage securePrefs = getSecurePrefs();
   String? username = await securePrefs.read(key: "username");
   String? password = await securePrefs.read(key: "password");
 
@@ -535,6 +532,16 @@ Future<http.Response> getSecuredPage(String url) async {
   if (response.statusCode == 401) throw const AuthorizationException("Ungültiger Nutzername oder Passwort");
   if (response.statusCode != 200) throw Exception("Unexpected response code ${response.statusCode} while fetching $url");
   return response;
+}
+
+FlutterSecureStorage getSecurePrefs() {
+
+  AndroidOptions getAndroidOptions() => const AndroidOptions(
+        encryptedSharedPreferences: true,
+      );
+  const iOptions = IOSOptions(accessibility: KeychainAccessibility.first_unlock);
+  final FlutterSecureStorage securePrefs = FlutterSecureStorage(aOptions: getAndroidOptions(), iOptions: iOptions);
+  return securePrefs;
 }
 
 class AuthorizationException implements Exception {

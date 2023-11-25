@@ -22,9 +22,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 //TODO über +  add syncfusion as license
 //TODO syncfusion
 //TODO home screen widgets
+//TODO app badge?
 
 //TODO Increment klasse nach sommerferien
-//TODO settings stundenplan
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
