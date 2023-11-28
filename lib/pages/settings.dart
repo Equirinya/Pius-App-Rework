@@ -14,6 +14,7 @@ import 'package:isar/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../connection.dart';
 import 'vertretungsplan.dart';
@@ -477,7 +478,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         (
           "Über",
-          "Kontakt, Impressum, Datenschutz",
+          "Kontakt, Datenschutz",
           Ionicons.information_circle,
           [
             (
@@ -490,6 +491,22 @@ class _SettingsPageState extends State<SettingsPage> {
                   "ueber",
                   SettingType.flutterAbout,
                   "Entwickelt von: Jacob Peters\nPius-Logo: Benedikt Seidl"
+                ),
+                (
+                "Kontakt",
+                "Schreibe mir für Feedback, Bug Reports oder Feature Requests",
+                Ionicons.mail_outline,
+                "-",
+                SettingType.customTap,
+                () => launchUrl(Uri.parse("mailto:equirinya@gmail.com"))
+                ),
+                (
+                  "Datenschutz",
+                  "Datenschutzerklärung",
+                  Ionicons.shield_checkmark_outline,
+                  "-",
+                  SettingType.customTap,
+                  () => launchUrl(Uri.parse("https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/privacy_policy.md"))
                 ),
               ]
             ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:math';
@@ -212,7 +213,8 @@ Future<List<(DateTime starting, DateTime updated, bool oberstufe, String url)>> 
   return stundenplaene;
 }
 
-Future<List<String>> getStufen(PdfDocument plan) async {
+Future<List<String>> getStufen(PdfDocument? plan) async {
+  if(plan == null) return List.empty(growable: true);
   List<String> stufen = List.empty(growable: true);
 
   for (int i = 0; i < plan.pages.count; i++) {
@@ -228,9 +230,10 @@ Future<List<String>> getStufen(PdfDocument plan) async {
   return (stufen.toSet().toList());
 }
 
-Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument plan, bool isOberstufe) value) async {
+Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isOberstufe) value) async {
+  if(value.$2 == null) return List.empty(growable: true);
   String stufe = value.$1;
-  PdfDocument plan = value.$2;
+  PdfDocument plan = value.$2!;
   bool isOberstufe = value.$3;
 
   var stufen = await getStufen(plan);
