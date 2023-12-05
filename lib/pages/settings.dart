@@ -88,122 +88,6 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
   }
 
-  void newLogin(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        TextEditingController usernameController = TextEditingController();
-        TextEditingController passwordController = TextEditingController();
-
-        int state = 0;
-        String error = "";
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              icon: const Icon(Icons.account_circle),
-              title: const Text("Neuer Login"),
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: "Benutzername",
-                    ),
-                  ),
-                  TextField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: "Passwort",
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: SizedBox(
-                      height: 32,
-                      child: IndexedStack(
-                        index: state,
-                        alignment: Alignment.center,
-                        children: [
-                          Text(error),
-                          const CupertinoActivityIndicator(),
-                          Icon(
-                            Icons.check,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                ],
-              ),
-              actions: [
-                TextButton(
-                    style: TextButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primaryContainer),
-                    onPressed: state == 0
-                        ? () async {
-                            if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-                              setState(() {
-                                state = 0;
-                                error = "Bitte fülle alle Felder aus.";
-                              });
-                              return;
-                            }
-
-                            setState(() {
-                              state = 1;
-                            });
-                            String lastUsername = await securePrefs.read(key: "username") ?? "";
-                            String lastPassword = await securePrefs.read(key: "password") ?? "";
-                            await securePrefs.write(key: "username", value: usernameController.text);
-                            await securePrefs.write(key: "password", value: passwordController.text);
-
-                            try {
-                              await checkCredentials();
-                            } on AuthorizationException catch (e) {
-                              setState(() {
-                                state = 0;
-                                error = e.msg;
-                              });
-                              securePrefs.write(key: "username", value: lastUsername);
-                              securePrefs.write(key: "password", value: lastPassword);
-                              return;
-                            } catch (e) {
-                              setState(() {
-                                state = 0;
-                                error = "Unerwarteter Fehler: ${e.toString()}";
-                              });
-                              securePrefs.write(key: "username", value: lastUsername);
-                              securePrefs.write(key: "password", value: lastPassword);
-                              return;
-                            }
-                            setState(() {
-                              state = 2;
-                            });
-                            await Future.delayed(const Duration(seconds: 1));
-                            widget.refresh();
-
-                            Navigator.of(context).pop();
-                          }
-                        : null,
-                    child: const Text("Einloggen")),
-                TextButton(
-                    onPressed: state == 0
-                        ? () {
-                            Navigator.of(context).pop();
-                          }
-                        : null,
-                    child: const Text("Abbrechen"))
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   List<(String, String?, IconData, List<(String?, List<(String, String?, IconData, String, SettingType, dynamic)>)>)> getSettings() => [
         (
           "Verbindung und Aktualisierungen",
@@ -213,7 +97,10 @@ class _SettingsPageState extends State<SettingsPage> {
             (
               "Login", //TODO make new login settingstype
               [
-                ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () => newLogin(context)),
+                ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () async {
+                  await newLogin(context, securePrefs);
+                  widget.refresh();
+                }),
               ]
             ),
             (
@@ -716,6 +603,121 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 }
+
+
+Future<void> newLogin(BuildContext context, FlutterSecureStorage securePrefs) => showDialog(
+  context: context,
+  builder: (context) {
+    TextEditingController usernameController = TextEditingController();
+    TextEditingController passwordController = TextEditingController();
+
+    int state = 0;
+    String error = "";
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return AlertDialog(
+          icon: const Icon(Icons.account_circle),
+          title: const Text("Neuer Login"),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: "Benutzername",
+                ),
+              ),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  labelText: "Passwort",
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: SizedBox(
+                  height: 32,
+                  child: IndexedStack(
+                    index: state,
+                    alignment: Alignment.center,
+                    children: [
+                      Text(error),
+                      const CupertinoActivityIndicator(),
+                      Icon(
+                        Icons.check,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            ],
+          ),
+          actions: [
+            TextButton(
+                style: TextButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                onPressed: state == 0
+                    ? () async {
+                  if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
+                    setState(() {
+                      state = 0;
+                      error = "Bitte fülle alle Felder aus.";
+                    });
+                    return;
+                  }
+
+                  setState(() {
+                    state = 1;
+                  });
+                  String lastUsername = await securePrefs.read(key: "username") ?? "";
+                  String lastPassword = await securePrefs.read(key: "password") ?? "";
+                  await securePrefs.write(key: "username", value: usernameController.text);
+                  await securePrefs.write(key: "password", value: passwordController.text);
+
+                  try {
+                    await checkCredentials();
+                  } on AuthorizationException catch (e) {
+                    setState(() {
+                      state = 0;
+                      error = e.msg;
+                    });
+                    securePrefs.write(key: "username", value: lastUsername);
+                    securePrefs.write(key: "password", value: lastPassword);
+                    return;
+                  } catch (e) {
+                    setState(() {
+                      state = 0;
+                      error = "Unerwarteter Fehler: ${e.toString()}";
+                    });
+                    securePrefs.write(key: "username", value: lastUsername);
+                    securePrefs.write(key: "password", value: lastPassword);
+                    return;
+                  }
+                  setState(() {
+                    state = 2;
+                  });
+                  await Future.delayed(const Duration(seconds: 1));
+
+                  Navigator.of(context).pop();
+                }
+                    : null,
+                child: const Text("Einloggen")),
+            TextButton(
+                onPressed: state == 0
+                    ? () {
+                  Navigator.of(context).pop();
+                }
+                    : null,
+                child: const Text("Abbrechen"))
+          ],
+        );
+      },
+    );
+  },
+);
+
 
 class ColorPaletteSelectionTile extends StatefulWidget {
   const ColorPaletteSelectionTile({super.key, required this.isar, required this.prefs});

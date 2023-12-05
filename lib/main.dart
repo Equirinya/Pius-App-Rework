@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -24,6 +25,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 //TODO home screen widgets
 //TODO app badge?
 
+//TODO fix overlap in update stundenplan
 //TODO Increment klasse nach sommerferien
 
 void main() async {
@@ -208,13 +210,24 @@ class _OuterPageState extends State<OuterPage> {
   @override
   void initState() {
     _selectedIndex = widget.prefs.getInt("selectedPage") ?? 0;
+
+    super.initState();
+  }
+
+  void asyncInit() async {
+    FlutterSecureStorage securePrefs = getSecurePrefs();
+
+    String? username = await securePrefs.read(key: "username");
+    String? password = await securePrefs.read(key: "password");
+    if(username == null || password == null){
+      if(context.mounted) await newLogin(context, securePrefs); //TODO would be better to replace with shortened welcome screen
+    }
     Connectivity().checkConnectivity().then((value) {
       if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? false) || value == ConnectivityResult.wifi) {
         loadVertretungsplan();
       }
     });
     loadCalendarContent();
-    super.initState();
   }
 
   void loadVertretungsplan() async {
@@ -223,8 +236,13 @@ class _OuterPageState extends State<OuterPage> {
       String vertretungsplanWebsite = await getVertretungsplanWebsite();
       await parseVertretungsplan(vertretungsplanWebsite, widget.isar);
       vertretungsLoadingNotifier.value = false;
-    } on Exception {
+    } on Exception catch (e, s)  {
       vertretungsLoadingNotifier.value = null;
+      if (kDebugMode) {
+        print("Error while fetching Vertretungsplan:");
+        print(e);
+        print(s);
+      }
     }
   }
 
