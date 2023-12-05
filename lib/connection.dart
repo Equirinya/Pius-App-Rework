@@ -420,11 +420,18 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
         String lehrkraft = tds[4].text;
         String bemerkung = tds[5].text;
         List<int> hervorgehoben = [];
-        for (DOM.Element td in tds) if (td.className == "vertretung neu") hervorgehoben.add(tds.indexOf(td));
+        for (DOM.Element td in tds) {
+          if (td.className == "vertretung neu") hervorgehoben.add(tds.indexOf(td));
+        }
 
-        List<int> stundenList = stunden.length == 1
-            ? [int.parse(stunden) - 1]
-            : [for (int i = int.parse(stunden.substring(0, 1)); i <= int.parse(stunden.substring(4, 5)); i++) i - 1];
+        List<int> stundenList;
+        if (stunden.contains(" ") || stunden.contains("-")) {
+          List<String> stundenSplit = stunden.split("-");
+          if(stundenSplit.length != 2) throw Exception("Invalid stunden format");
+          stundenList = [for (int i = int.parse(stundenSplit[0].trim()); i <= int.parse(stundenSplit[1].trim()); i++) i - 1];
+        } else {
+          stundenList = [int.parse(stunden) - 1];
+        }
         vertretungen.last.add(Vertretung()
           ..klasse = stufe
           ..stunden = stundenList

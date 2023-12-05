@@ -182,7 +182,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
                                 .findAllSync()
                                 .where(
                                     (element) => !filter || filters.any((filter) => filter == "${element.klasse} ${element.kurs}" || filter == element.klasse))
-                                .toList(),
+                                .toList()..sort((a, b) => a.stunden.first.compareTo(b.stunden.first)),
                             theme: Theme.of(context),
                             shorten: prefs.getBool("abbreviations") ?? true,
                           ),
@@ -208,7 +208,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
 }
 
 Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
-    {List<double> columnWidths = const [12 * 3, 12 * 5, 12 * 4, 12 * 5, 12 * 4], required ThemeData theme, bool shorten = true, double fontSize = 12}) {
+    {List<double> columnWidths = const [40, 64, 52, 60, 40], required ThemeData theme, bool shorten = true, double fontSize = 12}) {
   List<String> headers =
       shorten ? ["Stunde", "Art", "Kurs", "Raum", "akt.", "Bemerkung"] : ["Stunde(n)", "Art", "Fach / Kurs", "Raum", "Lehrkraft aktuell", "Bemerkung"];
 
