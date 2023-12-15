@@ -112,7 +112,8 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
         .$4;
 
     return (PdfDocument(inputBytes: (await getSecuredPage(klassenplan)).bodyBytes), PdfDocument(inputBytes: (await getSecuredPage(oberstufenplan)).bodyBytes));
-  } catch (e) {
+  } catch (e, s) {
+    debugPrintStack(stackTrace: s);
     throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
   }
 }
@@ -531,8 +532,14 @@ Future<http.Response> getSecuredPage(String url) async {
 
   if (username == null || password == null) throw Exception("No username or password found");
 
+  if(username == "test" && password == "test") {
+    if(url == vertretungsplanUrl) url = "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/vertretungsplan.html";
+    if(url == stundenplanUrl) url =  "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/stundenplaene.html";
+    return await http.get(Uri.parse(url));
+  }
+
   Map<String, String> authorizationHeaders = {
-    "Authorization": "Basic " + base64Encode(utf8.encode("$username:$password")),
+    "Authorization": "Basic ${base64Encode(utf8.encode("$username:$password"))}",
   };
 
   if (username.isEmpty || password.isEmpty) throw Exception("Username or Password is empty");

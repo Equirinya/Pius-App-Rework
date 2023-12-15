@@ -208,7 +208,7 @@ class _OuterPageState extends State<OuterPage> {
   @override
   void initState() {
     _selectedIndex = widget.prefs.getInt("selectedPage") ?? 0;
-
+    asyncInit();
     super.initState();
   }
 
