@@ -377,7 +377,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   Ionicons.information_circle,
                   "ueber",
                   SettingType.flutterAbout,
-                  "Entwickelt von: Jacob Peters\nPius-Logo: Benedikt Seidl"
+                  "Entwickler: Jacob Peters\n\nPius-Logo: Benedikt Seidl\n\nSyncfusion libraries licensed under the Syncfusion Community License"
                 ),
                 (
                 "Kontakt",

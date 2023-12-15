@@ -20,8 +20,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-//TODO über +  add syncfusion as license
-//TODO syncfusion
 //TODO home screen widgets
 //TODO app badge?
 
