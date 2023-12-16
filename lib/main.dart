@@ -217,7 +217,7 @@ class _OuterPageState extends State<OuterPage> {
 
     String? username = await securePrefs.read(key: "username");
     String? password = await securePrefs.read(key: "password");
-    if(username == null || password == null){
+    if(username == null || password == null || username.isEmpty || password.isEmpty) {
       if(context.mounted) await newLogin(context, securePrefs); //TODO would be better to replace with shortened welcome screen
     }
     Connectivity().checkConnectivity().then((value) {
