@@ -1,6 +1,6 @@
 # Pius App
 Willkommen zur neuen Pius App! Stunden- und Vertretungsplan in einem!
-Fragen und Probleme bitte an <a href="mailto:equirinya@gmail.com>
+Fragen und Probleme bitte an equirinya@gmail.com
 
 # Features
 
