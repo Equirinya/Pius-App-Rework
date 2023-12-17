@@ -86,12 +86,17 @@ class _MyAppState extends State<MyApp> {
           ColorScheme darkColorScheme;
           VertretungsColors? vertretungsColors;
 
-          if (colorSchemeIndex > 1 && colorSchemeIndex <= widget.isar.colorPalettes.where().countSync() + 1) {
+          //order of color schemes: pius, dynamic?, [user defined]
+
+          bool dynamicSchemeExists = lightDynamic != null && darkDynamic != null;
+          int maxColorSchemeIndex = widget.isar.colorPalettes.where().countSync() + (dynamicSchemeExists ? 1 : 0);
+
+          if (colorSchemeIndex >= (dynamicSchemeExists ? 2 : 1) && colorSchemeIndex <= maxColorSchemeIndex) {
             ColorPalette palette = widget.isar.colorPalettes.where().findAllSync()[colorSchemeIndex - 2];
             lightColorScheme = palette.toColorScheme();
             darkColorScheme = palette.toColorScheme(true);
             vertretungsColors = palette.fromSeed ? null : palette.getExactColors();
-          } else if (lightDynamic != null && darkDynamic != null && colorSchemeIndex == 1) {
+          } else if (dynamicSchemeExists && colorSchemeIndex == 1) {
             // On Android S+ devices, use the provided dynamic color scheme.
             // (Recommended) Harmonize the dynamic color scheme' built-in semantic colors.
             lightColorScheme = lightDynamic.harmonized();

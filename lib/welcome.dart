@@ -88,7 +88,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
+    final List<Widget> pages = [ //TODO set column size to min and wrap with scrollview
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
