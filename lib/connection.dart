@@ -104,17 +104,22 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
   if (stundenplaene.length < 2) throw Exception("less than 2 stundenplaene found");
 
   try {
-    String klassenplan = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)))
-        .firstWhere((element) => element.$1.isBefore(DateTime.now()))
-        .$4;
-    String oberstufenplan = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)))
-        .firstWhere((element) => element.$1.isBefore(DateTime.now()))
-        .$4;
+    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> klassenplaene = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
+    if(klassenplaene.isEmpty) throw Exception("Keinen Klassenplan gefunden");
+    String klassenplan;
+    if(klassenplaene.length == 1) klassenplan = klassenplaene.first.$4;
+    else klassenplan = klassenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+
+    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> oberstufenplaene = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
+    if(oberstufenplaene.isEmpty) throw Exception("Keinen Oberstufenplan gefunden");
+    String oberstufenplan;
+    if(oberstufenplaene.length == 1) oberstufenplan = oberstufenplaene.first.$4;
+    else oberstufenplan = oberstufenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
 
     return (PdfDocument(inputBytes: (await getSecuredPage(klassenplan)).bodyBytes), PdfDocument(inputBytes: (await getSecuredPage(oberstufenplan)).bodyBytes));
   } catch (e, s) {
     debugPrintStack(stackTrace: s);
-    throw Exception("Entweder Klassen oder Oberstufenplan fehlen: $e");
+    throw Exception("Fehler beim Laden der Klassen und Oberstufenpläne: $e");
   }
 }
 
