@@ -380,6 +380,11 @@ void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar i
 }
 
 Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+  DateTime initialDisplayDate = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute));
+  if(stunden.isNotEmpty && initialDisplayDate.isBefore(stunden.first.gueltigAb)) {
+    DateTime firstTime = stunden.first.gueltigAb;
+    initialDisplayDate = firstTime.add(const Duration(days: 7)).subtract(Duration(days: firstTime.weekday - 1, hours: firstTime.hour, minutes: firstTime.minute));
+  }
   CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
   Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
   var result = await Navigator.push(getContext(), MaterialPageRoute(builder: (context) {
@@ -393,7 +398,7 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
             title: const Text("Wähle deine Kurse"),
           ),
           body: SfCalendar(
-            initialDisplayDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1)),
+            initialDisplayDate: initialDisplayDate,
             view: CalendarView.day,
             controller: calendarController,
             onViewChanged: (viewChangedDetails) {
@@ -463,10 +468,9 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
             viewHeaderStyle: const ViewHeaderStyle(
               dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
             ),
-            minDate: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute)),
-            maxDate: DateTime.now()
-                .add(Duration(days: min(5, max(0, 5 - DateTime.now().weekday)), hours: 23 - DateTime.now().hour, minutes: 59 - DateTime.now().minute))
-                .add(const Duration(days: 7)),
+            minDate: initialDisplayDate,
+            maxDate: initialDisplayDate
+                .add(const Duration(days: 12)).subtract(const Duration(minutes: 1)),
             selectionDecoration: const BoxDecoration(
               color: Colors.transparent,
               border: null,
