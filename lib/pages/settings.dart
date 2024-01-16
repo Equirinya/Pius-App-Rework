@@ -246,8 +246,8 @@ class _SettingsPageState extends State<SettingsPage> {
             "Klasse/Kurs",
             [
               (
-              "Ändere Klasse/Kurs",
-              "Ändere die Klasse/den Kurs des Stundenplans",
+              "Ändere Stundenplan",
+              "Ändere die Klasse/die Kurse des Stundenplans",
               Ionicons.library_outline,
               "",
               SettingType.customTap,

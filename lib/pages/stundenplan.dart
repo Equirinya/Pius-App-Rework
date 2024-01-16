@@ -432,7 +432,7 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
               if (active == null) throw StateError("couldnt find active Stunde");
               return GestureDetector(
                 onTap: () => setState(() {
-                  List<Stunde> stundenToActivate = stunden.where((element) => element.name == appointment.subject).toList();
+                  List<Stunde> stundenToActivate = stunden.where((element) => element.name.split(" ").getRange(0, 2).join(" ") == appointment.subject.split(" ").getRange(0, 2).join(" ")).toList();
                   for (Stunde stunde in stundenToActivate) {
                     activeStunden[stunde] = !active;
                   }
