@@ -204,6 +204,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                       String lastPassword = await securePrefs.read(key: "password") ?? "";
                       await securePrefs.write(key: "username", value: usernameController.text);
                       await securePrefs.write(key: "password", value: passwordController.text);
+                      //print(passwordController.text);
+                      //print(await securePrefs.read(key: "password"));
 
                       try {
                         await checkCredentials();

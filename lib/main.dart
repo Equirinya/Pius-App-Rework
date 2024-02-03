@@ -92,7 +92,7 @@ class _MyAppState extends State<MyApp> {
           int maxColorSchemeIndex = widget.isar.colorPalettes.where().countSync() + (dynamicSchemeExists ? 1 : 0);
 
           if (colorSchemeIndex >= (dynamicSchemeExists ? 2 : 1) && colorSchemeIndex <= maxColorSchemeIndex) {
-            ColorPalette palette = widget.isar.colorPalettes.where().findAllSync()[colorSchemeIndex - 2];
+            ColorPalette palette = widget.isar.colorPalettes.where().findAllSync()[colorSchemeIndex - (dynamicSchemeExists ? 2 : 1)];
             lightColorScheme = palette.toColorScheme();
             darkColorScheme = palette.toColorScheme(true);
             vertretungsColors = palette.fromSeed ? null : palette.getExactColors();

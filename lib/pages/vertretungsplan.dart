@@ -208,7 +208,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
 }
 
 Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
-    {List<double> columnWidths = const [40, 64, 52, 60, 40], required ThemeData theme, bool shorten = true, double fontSize = 12}) {
+    {List<double> columnWidths = const [45, 72, 52, 60, 40], required ThemeData theme, bool shorten = true, double fontSize = 12}) {
   List<String> headers =
       shorten ? ["Stunde", "Art", "Kurs", "Raum", "akt.", "Bemerkung"] : ["Stunde(n)", "Art", "Fach / Kurs", "Raum", "Lehrkraft aktuell", "Bemerkung"];
 
