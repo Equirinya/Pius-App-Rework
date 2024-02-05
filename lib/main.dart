@@ -252,11 +252,11 @@ class _OuterPageState extends State<OuterPage> {
     }
   }
 
-  void loadCalendarContent() async {
-    bool shouldUpdateTermine = true ||
+  void loadCalendarContent({bool forceUpdateStundenPlan = false}) async {
+    bool shouldUpdateTermine = forceUpdateStundenPlan ||
         DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0)
             .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
-    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
+    bool shouldUpdateStundenplan = forceUpdateStundenPlan || DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
         .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
     if (shouldUpdateTermine || shouldUpdateStundenplan) {
       calendarLoadingNotifier.value = true;
@@ -301,6 +301,8 @@ class _OuterPageState extends State<OuterPage> {
             isar: widget.isar,
             vertretungsLoading: vertretungsLoadingNotifier,
             calendarLoading: calendarLoadingNotifier,
+            refreshStundenplan: () => loadCalendarContent(forceUpdateStundenPlan: true),
+            refreshVertretungsplan: loadVertretungsplan,
           ),
           VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
           NewsPage(isar: widget.isar),

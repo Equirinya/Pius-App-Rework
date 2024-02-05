@@ -347,7 +347,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       if (result != null) {
                         List<String> kurse = result.split(RegExp(r'[,|\n]'));
                         List<Stunde> toAdd = stunden.where((element) => kurse.contains(element.name)).toList();
-                        setStundenplan(toAdd, stufe, true, widget.isar, prefs, () { });
+                        setStundenplan(toAdd, stufe, true, widget.isar, prefs, widget.refresh);
                       }
                     },);
                   }

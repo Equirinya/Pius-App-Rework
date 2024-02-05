@@ -22,41 +22,48 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 //TODO show original classes on vertetung dialog
 
 class StundenplanPage extends StatefulWidget {
-  const StundenplanPage({super.key, required this.isar, required this.vertretungsLoading, required this.calendarLoading});
+  const StundenplanPage({super.key, required this.isar, required this.vertretungsLoading, required this.calendarLoading, required this.refreshStundenplan, required this.refreshVertretungsplan});
 
   final Isar isar;
   final ValueNotifier<bool?> vertretungsLoading;
   final ValueNotifier<bool?> calendarLoading;
+  final VoidCallback refreshStundenplan;
+  final VoidCallback refreshVertretungsplan;
 
   @override
   State<StundenplanPage> createState() => _StundenplanPageState();
 }
 
 class _StundenplanPageState extends State<StundenplanPage> {
-
   late SharedPreferences prefs;
   bool initialized = false;
+  bool calendarInitialized = false;
   bool? calendarLoading = false;
   bool? vertretungLoading = false;
+  CalendarController controller = CalendarController();
+  late CalendarView view;
 
   @override
   void initState() {
     SharedPreferences.getInstance().then((value) {
       prefs = value;
+      view = prefs.getInt("stundenplanView") == 0
+          ? CalendarView.day
+          : prefs.getInt("stundenplanView") == 2
+              ? CalendarView.week
+              : CalendarView.workWeek;
       initialized = true;
       setState(() {});
     });
     widget.vertretungsLoading.addListener(() {
       if (!(widget.vertretungsLoading.value ?? false))
-        setState(() {
-          vertretungLoading = widget.vertretungsLoading.value;
-        });
+        vertretungLoading = widget.vertretungsLoading.value;
+      setState(() {});
     });
     widget.calendarLoading.addListener(() {
       if (!(widget.calendarLoading.value ?? false))
-        setState(() {
-          calendarLoading = widget.calendarLoading.value;
-        });
+        calendarLoading = widget.calendarLoading.value;
+      setState(() {});
     });
     super.initState();
   }
@@ -66,223 +73,281 @@ class _StundenplanPageState extends State<StundenplanPage> {
     if (!initialized) return const Center(child: CircularProgressIndicator());
     bool emptyCalendar = widget.isar.stundes.where().countSync() == 0;
 
+    ButtonStyle selectedButtonStyle = ButtonStyle(
+      backgroundColor: MaterialStateProperty.all(Theme.of(context).colorScheme.surfaceVariant),
+    );
+
     return SafeArea(
       child: Scaffold(
-        body: Column(
-          children: [
-            if (calendarLoading == null || vertretungLoading == null)
-              Container(
-                width: double.infinity,
-                color: Theme.of(context).colorScheme.errorContainer,
-                alignment: Alignment.center,
-                child: Text("Konnte ${[
-                  if (vertretungLoading == null) "Vertretungsplan",
-                  if (calendarLoading == null) "Stundenplan"
-                ].join(" und ")} nicht aktualisieren"),
+          appBar: AppBar(
+            title: Text("${DateFormat("LLLL", "DE_de").format(controller.displayDate ?? DateTime.now())} ${controller.displayDate?.year.toString().substring(2) ?? ""}"),
+            surfaceTintColor: Colors.transparent,
+            actions: [
+              IconButton(
+                onPressed: () => controller.displayDate = DateTime.now().copyWith(hour: 7, minute: 30),
+                icon: const Icon(Icons.today_rounded),
               ),
-            Expanded(
-              child: SfCalendar(
-                view: prefs.getInt("stundenplanView") == 0
-                    ? CalendarView.day
-                    : prefs.getInt("stundenplanView") == 2
-                        ? CalendarView.week
-                        : CalendarView.workWeek,
-                firstDayOfWeek: 1,
-                showWeekNumber: true,
-                showTodayButton: true,
-                initialDisplayDate: DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day - DateTime.now().weekday + 1),
-                timeSlotViewSettings: const TimeSlotViewSettings(
-                  timeIntervalHeight: 80,
-                  timeFormat: "HH",
+              IconButton(
+                  onPressed: () => setState(() {
+                    controller.view = CalendarView.day;
+                    view = CalendarView.day;
+                      }),
+                  icon: const Icon(Icons.calendar_view_day_rounded),
+                  style: view == CalendarView.day ? selectedButtonStyle : null),
+              IconButton(
+                  onPressed: () => setState(() {
+                    controller.view = CalendarView.workWeek;
+                    view = CalendarView.workWeek;
+                  }),
+                  icon: const Icon(Icons.view_week_outlined),
+                  style: view == CalendarView.workWeek ? selectedButtonStyle : null),
+              IconButton(
+                onPressed: () => setState(() {
+                  controller.view = CalendarView.week;
+                  view = CalendarView.week;
+                }),
+                icon: const Icon(Icons.calendar_view_week_rounded),
+                style: view == CalendarView.week ? selectedButtonStyle : null,
+              ),
+              PopupMenuButton(
+                itemBuilder: (context) {
+                  return [
+                    PopupMenuItem(
+                      child: Text("Vertretungsplan aktualisieren"),
+                      onTap: () => widget.refreshVertretungsplan(),
+                    ),
+                    PopupMenuItem(
+                      child: Text("Stundenplan aktualisieren"),
+                      onTap: () => widget.refreshStundenplan(),
+                    ),
+                  ];
+                },
+              )
+            ],
+          ),
+          body: Column(
+            children: [
+              if (calendarLoading == null || vertretungLoading == null)
+                Container(
+                  width: double.infinity,
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  alignment: Alignment.center,
+                  child: Text("Konnte ${[
+                    if (vertretungLoading == null) "Vertretungsplan",
+                    if (calendarLoading == null) "Stundenplan"
+                  ].join(" und ")} nicht aktualisieren"),
                 ),
-                allowViewNavigation: true,
-                allowedViews: const [
-                  CalendarView.day,
-                  CalendarView.workWeek,
-                  CalendarView.week,
-                ],
-                appointmentBuilder: (context, calendarAppointmentDetails) {
-                  Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
-                  bool isTermin = (appointment.notes != null && appointment.notes!.isNotEmpty && appointment.notes! == "termin");
-                  bool isVertretung = (!isTermin && appointment.notes != null && appointment.notes!.isNotEmpty);
-                  ColorScheme colorScheme = Theme.of(context).colorScheme;
+              if(widget.calendarLoading.value == true || widget.vertretungsLoading.value == true)
+                const LinearProgressIndicator(minHeight: 2),
+              Expanded(
+                child: SfCalendar(
+                  controller: controller,
+                  view: view,
+                  firstDayOfWeek: 1,
+                  showWeekNumber: true,
+                  showTodayButton: true,
+                  headerHeight: 0,
+                  initialDisplayDate: DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day - DateTime.now().weekday + 1),
+                  timeSlotViewSettings: const TimeSlotViewSettings(
+                    timeIntervalHeight: 80,
+                    timeFormat: "HH",
+                  ),
+                  allowViewNavigation: true,
+                  allowedViews: const [
+                    CalendarView.day,
+                    CalendarView.workWeek,
+                    CalendarView.week,
+                  ],
+                  appointmentBuilder: (context, calendarAppointmentDetails) {
+                    Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
+                    bool isTermin = (appointment.notes != null && appointment.notes!.isNotEmpty && appointment.notes! == "termin");
+                    bool isVertretung = (!isTermin && appointment.notes != null && appointment.notes!.isNotEmpty);
+                    ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-                  Map<String, dynamic> vertretungsMap = isVertretung ? jsonDecode(appointment.notes ?? "{}") : {};
-                  return GestureDetector(
-                    onTap: isVertretung
-                        ? () => showDialog(
-                              builder: (context) {
-                                return Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: klassenVertretungsBlock([Vertretung.fromMap(vertretungsMap)], theme: Theme.of(context)),
+                    Map<String, dynamic> vertretungsMap = isVertretung ? jsonDecode(appointment.notes ?? "{}") : {};
+                    return GestureDetector(
+                      onTap: isVertretung
+                          ? () => showDialog(
+                                builder: (context) {
+                                  return Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: klassenVertretungsBlock([Vertretung.fromMap(vertretungsMap)], theme: Theme.of(context)),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              context: context,
-                            )
-                        : isTermin
-                            ? () => showDialog(
-                                  builder: (context) {
-                                    DateFormat dateFormat = DateFormat("dd.MM.yy\nHH:mm");
+                                  );
+                                },
+                                context: context,
+                              )
+                          : isTermin
+                              ? () => showDialog(
+                                    builder: (context) {
+                                      DateFormat dateFormat = DateFormat("dd.MM.yy\nHH:mm");
 
-                                    return Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: colorScheme.secondaryContainer,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          padding: const EdgeInsets.all(8),
-                                          child: IntrinsicHeight(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Column(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      dateFormat.format(appointment.startTime),
-                                                      textAlign: TextAlign.center,
-                                                      style: TextStyle(
-                                                        color: colorScheme.onSecondaryContainer,
-                                                        fontSize: 12,
+                                      return Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.secondaryContainer,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.all(8),
+                                            child: IntrinsicHeight(
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        dateFormat.format(appointment.startTime),
+                                                        textAlign: TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: colorScheme.onSecondaryContainer,
+                                                          fontSize: 12,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    const SizedBox(
-                                                      height: 4,
-                                                    ),
-                                                    Text(
-                                                      dateFormat.format(appointment.endTime),
-                                                      textAlign: TextAlign.center,
-                                                      style: TextStyle(
-                                                        color: colorScheme.onSecondaryContainer,
-                                                        fontSize: 12,
+                                                      const SizedBox(
+                                                        height: 4,
                                                       ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                  child: VerticalDivider(
-                                                    width: 1,
-                                                    color: colorScheme.onSecondaryContainer,
+                                                      Text(
+                                                        dateFormat.format(appointment.endTime),
+                                                        textAlign: TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: colorScheme.onSecondaryContainer,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                ),
-                                                Flexible(
-                                                  child: Text(
-                                                    appointment.subject,
-                                                    style: TextStyle(
+                                                  Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                    child: VerticalDivider(
+                                                      width: 1,
                                                       color: colorScheme.onSecondaryContainer,
-                                                      fontSize: 16,
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                  Flexible(
+                                                    child: Text(
+                                                      appointment.subject,
+                                                      style: TextStyle(
+                                                        color: colorScheme.onSecondaryContainer,
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                  context: context,
-                                )
-                            : null,
-                    child: Container(
-                      decoration: BoxDecoration(
-                          color: isTermin
-                              ? colorScheme.secondaryContainer
-                              : isVertretung
-                                  ? colorScheme.errorContainer
-                                  : colorScheme.primaryContainer,
-                          borderRadius: const BorderRadius.all(Radius.circular(4))),
-                      width: calendarAppointmentDetails.bounds.width,
-                      height: calendarAppointmentDetails.bounds.height,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(1.0),
-                                child: Text(
-                                  appointment.subject,
-                                  overflow: isTermin && appointment.isAllDay ? TextOverflow.ellipsis : null,
-                                  maxLines: isTermin && appointment.isAllDay ? 1 : null,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isTermin ? colorScheme.onSecondaryContainer : null,
+                                      );
+                                    },
+                                    context: context,
+                                  )
+                              : null,
+                      child: Container(
+                        decoration: BoxDecoration(
+                            color: isTermin
+                                ? colorScheme.secondaryContainer
+                                : isVertretung
+                                    ? colorScheme.errorContainer
+                                    : colorScheme.primaryContainer,
+                            borderRadius: const BorderRadius.all(Radius.circular(4))),
+                        width: calendarAppointmentDetails.bounds.width,
+                        height: calendarAppointmentDetails.bounds.height,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(1.0),
+                                  child: Text(
+                                    appointment.subject,
+                                    overflow: isTermin && appointment.isAllDay ? TextOverflow.ellipsis : null,
+                                    maxLines: isTermin && appointment.isAllDay ? 1 : null,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isTermin ? colorScheme.onSecondaryContainer : null,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
-                          ),
-                          if (isVertretung && vertretungsMap["eva"] != null)
-                            Align(
-                              alignment: Alignment.bottomRight,
-                              child: Padding(
-                                padding: const EdgeInsets.all(2.0),
-                                child: Icon(
-                                  Ionicons.information_circle_outline,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.onErrorContainer,
+                            if (isVertretung && vertretungsMap["eva"] != null)
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2.0),
+                                  child: Icon(
+                                    Ionicons.information_circle_outline,
+                                    size: 16,
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
                                 ),
-                              ),
-                            )
-                        ],
+                              )
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-                //viewNavigationMode: ViewNavigationMode.snap,
-                onViewChanged: (details) {
-                  int visibleDates = details.visibleDates.length;
-                  int view = visibleDates == 1
-                      ? 0
-                      : visibleDates == 7
-                          ? 2
-                          : 1;
-                  prefs.setInt("stundenplanView", view);
-                },
-                selectionDecoration: const BoxDecoration(
-                  color: Colors.transparent,
-                  border: null,
+                    );
+                  },
+                  //viewNavigationMode: ViewNavigationMode.snap,
+                  onViewChanged: (details) {
+                    int visibleDates = details.visibleDates.length;
+                    int view = visibleDates == 1
+                        ? 0
+                        : visibleDates == 7
+                            ? 2
+                            : 1;
+                    this.view = controller.view ?? CalendarView.workWeek;
+                    prefs.setInt("stundenplanView", view);
+                    if (calendarInitialized)
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (context.mounted) setState(() {});
+                      });
+                    else
+                      calendarInitialized = true;
+                  },
+                  selectionDecoration: const BoxDecoration(
+                    color: Colors.transparent,
+                    border: null,
+                  ),
+                  dataSource: _getCalendarDataSource(
+                      isar: widget.isar,
+                      prefs: prefs,
+                      stufe: prefs.getString("stundenplanStufe") ?? "",
+                      isOberstufe: prefs.getBool("stundenplanIsOberstufe") ?? false),
                 ),
-                dataSource: _getCalendarDataSource(
-                    isar: widget.isar,
-                    prefs: prefs,
-                    stufe: prefs.getString("stundenplanStufe") ?? "",
-                    isOberstufe: prefs.getBool("stundenplanIsOberstufe") ?? false),
               ),
-            ),
-          ],
-        ),
-        floatingActionButton: emptyCalendar
-            ? FloatingActionButton.extended(
-                onPressed: () => addStundenplan(context, widget.isar, prefs,  () {
-                  setState(() {});
-                  widget.calendarLoading.value = false;
-                }),
-                tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
-                label: const Text("Klasse/Stufe auswählen"),
-                icon: const Icon(Ionicons.options_outline),
-              ) : null
-            // : FloatingActionButton(
-            //     onPressed: addStundenplan,
-            //     tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
-            //     child: const Icon(Ionicons.options_outline)),
-      ),
+            ],
+          ),
+          floatingActionButton: emptyCalendar
+              ? FloatingActionButton.extended(
+                  onPressed: () => addStundenplan(context, widget.isar, prefs, () {
+                    setState(() {});
+                    widget.calendarLoading.value = false;
+                  }),
+                  tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
+                  label: const Text("Klasse/Stufe auswählen"),
+                  icon: const Icon(Ionicons.options_outline),
+                )
+              : null
+          // : FloatingActionButton(
+          //     onPressed: addStundenplan,
+          //     tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
+          //     child: const Icon(Ionicons.options_outline)),
+          ),
     );
   }
 }
 
-
-void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh, [Function(List<Stunde> stunden,   String stufe)? customKursSelection]) async {
+void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh,
+    [Function(List<Stunde> stunden, String stufe)? customKursSelection]) async {
   List<String> klassen = List.empty(growable: true);
   List<String> oberstufen = List.empty(growable: true);
   List<String> stufen = List.empty(growable: true);
@@ -293,46 +358,46 @@ void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, Vo
   showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Klasse/Stufe auswählen"),
-        icon: const Icon(Ionicons.options_outline),
-        content: StatefulBuilder(
-          builder: (context, listSetState) {
-            if (stufen.isEmpty) {
-              (() async {
-                try {
-                  (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
+            title: const Text("Klasse/Stufe auswählen"),
+            icon: const Icon(Ionicons.options_outline),
+            content: StatefulBuilder(
+              builder: (context, listSetState) {
+                if (stufen.isEmpty) {
+                  (() async {
+                    try {
+                      (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
 
-                  klassen = await compute(getStufen, klassenplan);
-                  oberstufen = await compute(getStufen, oberstufenplan);
-                  if (context.mounted) {
-                    listSetState(() {
-                      stufen.addAll(klassen);
-                      stufen.addAll(oberstufen);
-                    });
-                  }
-                } catch (e) {
-                  if (kDebugMode) {
-                    print(e);
-                  }
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                  ));
+                      klassen = await compute(getStufen, klassenplan);
+                      oberstufen = await compute(getStufen, oberstufenplan);
+                      if (context.mounted) {
+                        listSetState(() {
+                          stufen.addAll(klassen);
+                          stufen.addAll(oberstufen);
+                        });
+                      }
+                    } catch (e) {
+                      if (kDebugMode) {
+                        print(e);
+                      }
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text("Konnte Stundenpläne nicht abrufen: $e"),
+                      ));
+                    }
+                  }).call();
+                  return const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: CupertinoActivityIndicator(),
+                  );
                 }
-              }).call();
-              return const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: CupertinoActivityIndicator(),
-              );
-            }
-            if (loading || klassenplan == null || oberstufenplan == null) {
-              return const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: CupertinoActivityIndicator(),
-              );
-            }
-            return SingleChildScrollView(
-                child: Column(
+                if (loading || klassenplan == null || oberstufenplan == null) {
+                  return const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: CupertinoActivityIndicator(),
+                  );
+                }
+                return SingleChildScrollView(
+                    child: Column(
                   children: [
                     for (int i = 0; i < stufen.length; i++)
                       ListTile(
@@ -350,7 +415,7 @@ void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, Vo
                             });
                             List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
                             if (context.mounted) Navigator.pop(context);
-                            if(customKursSelection != null) {
+                            if (customKursSelection != null) {
                               customKursSelection(stunden, oberstufen[i - klassen.length]);
                             } else {
                               showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
@@ -360,10 +425,10 @@ void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, Vo
                       ),
                   ],
                 ));
-          },
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
-      ));
+              },
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
+          ));
 }
 
 void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
@@ -383,11 +448,13 @@ void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar i
   refresh();
 }
 
-Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+Future<bool> showStundenplanSelection(
+    List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
   DateTime initialDisplayDate = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute));
-  if(stunden.isNotEmpty && initialDisplayDate.isBefore(stunden.first.gueltigAb)) {
+  if (stunden.isNotEmpty && initialDisplayDate.isBefore(stunden.first.gueltigAb)) {
     DateTime firstTime = stunden.first.gueltigAb;
-    initialDisplayDate = firstTime.add(const Duration(days: 7)).subtract(Duration(days: firstTime.weekday - 1, hours: firstTime.hour, minutes: firstTime.minute));
+    initialDisplayDate =
+        firstTime.add(const Duration(days: 7)).subtract(Duration(days: firstTime.weekday - 1, hours: firstTime.hour, minutes: firstTime.minute));
   }
   CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
   Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
@@ -436,7 +503,9 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
               if (active == null) throw StateError("couldnt find active Stunde");
               return GestureDetector(
                 onTap: () => setState(() {
-                  List<Stunde> stundenToActivate = stunden.where((element) => element.name.split(" ").getRange(0, 2).join(" ") == appointment.subject.split(" ").getRange(0, 2).join(" ")).toList();
+                  List<Stunde> stundenToActivate = stunden
+                      .where((element) => element.name.split(" ").getRange(0, 2).join(" ") == appointment.subject.split(" ").getRange(0, 2).join(" "))
+                      .toList();
                   for (Stunde stunde in stundenToActivate) {
                     activeStunden[stunde] = !active;
                   }
@@ -473,8 +542,7 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
               dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
             ),
             minDate: initialDisplayDate,
-            maxDate: initialDisplayDate
-                .add(const Duration(days: 12)).subtract(const Duration(minutes: 1)),
+            maxDate: initialDisplayDate.add(const Duration(days: 12)).subtract(const Duration(minutes: 1)),
             selectionDecoration: const BoxDecoration(
               color: Colors.transparent,
               border: null,
@@ -497,7 +565,7 @@ Future<bool> showStundenplanSelection(List<Stunde> stunden, String stufe, BuildC
       },
     );
   }));
-  if(result is bool) return result;
+  if (result is bool) return result;
   return false;
 }
 
@@ -725,6 +793,7 @@ class _AppointmentDataSource extends CalendarDataSource {
   _AppointmentDataSource(List<Appointment> source) {
     appointments = source;
   }
+
   @override
   bool isAllDay(int index) {
     return appointments![index].isAllDay;

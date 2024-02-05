@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:PiusApp/connection.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -107,12 +108,11 @@ class _NewsPageState extends State<NewsPage> {
         dynamic image = json["featured_image_src_large"];
         if (image is List) {
           image = image[0];
-        }
-        else {
+        } else {
           image = null;
         }
         String? teaser = parseFragment(json['excerpt']['rendered']).text;
-        if(teaser?.isEmpty ?? false) {
+        if (teaser?.isEmpty ?? false) {
           teaser = null;
         }
         String title = parseFragment(json['title']['rendered']).text ?? "";
@@ -248,121 +248,108 @@ class _NewsPageState extends State<NewsPage> {
               child: ListView.builder(
                 itemCount: news.length,
                 itemBuilder: (context, index) {
-
                   Widget tile = Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 0.0),
+                    padding: news[index].teaser != null ? EdgeInsets.zero : EdgeInsets.only(top: 10.0, bottom: 18),
                     child: ListTile(
-                      title: Text(news[index].title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
-                      leading: news[index].imageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8.0),
-                              child: SizedBox(
-                                height: double.infinity,
-                                child: CachedNetworkImage(
-                                  imageUrl: news[index].imageUrl!,
-                                  placeholder: (context, url) => const CupertinoActivityIndicator(),
-                                  errorWidget: (context, url, error) => const Icon(Icons.error),
-                                  width: size.width / 4,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            )
-                          : null,
-                      subtitle: news[index].teaser != null
-                          ? Text(
-                              news[index].teaser!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                      isThreeLine: news[index].teaser != null,
-                      onTap: () {
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) {
-                            Size size = MediaQuery.of(context).size;
-                            return Scaffold(
-                              body: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (news[index].imageUrl != null)
-                                      InteractiveViewer(
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(maxHeight: size.height / 2, minWidth: size.width),
-                                          child: CachedNetworkImage(
-                                            width: size.width,
-                                            fit: BoxFit.contain,
-                                            imageUrl: news[index].imageUrl!,
-                                            placeholder: (context, url) => const CupertinoActivityIndicator(),
-                                            errorWidget: (context, url, error) => const Icon(Icons.error),
-                                          ),
-                                        ),
-                                      ),
-                                    if (news[index].imageUrl != null) const SizedBox(height: 8.0),
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 24.0, left: 16),
-                                      child: Text(
-                                        DateFormat('dd.MM.yy HH:mm').format(news[index].created),
-                                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 16.0, right: 16.0,bottom: 16.0),
-                                      child: Text(
-                                        news[index].title,
-                                        style: Theme.of(context).textTheme.headlineMedium,
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: HtmlWidget(
-                                        news[index].content,
-                                        onTapUrl: (url) {
-                                          launchUrl(Uri.parse(url));
-                                          return true;
-                                        },
-                                        textStyle: Theme.of(context).textTheme.bodyLarge,
-                                        onTapImage: (p0) {
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) {
-                                              bool isClosing = false;
-                                              return InteractiveViewer(
-                                                maxScale: 4,
-                                                child: TapRegion(
-                                                  onTapOutside: (_) {
-                                                    if (isClosing) {
-                                                      return;
-                                                    }
-                                                    isClosing = true;
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                  child: Center(
-                                                    child: Container(
-                                                      child: CachedNetworkImage(
-                                                        imageUrl: p0.sources.first.url,
-                                                        placeholder: (context, url) => const CupertinoActivityIndicator(),
-                                                        errorWidget: (context, url, error) => const Icon(Icons.error),
-                                                        fit: BoxFit.contain,
-
-                                                      ),
-                                                    ),
+                        title: Text(news[index].title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: SizedBox(
+                            height: double.infinity,
+                            width: size.width / 4,
+                            child: news[index].imageUrl != null
+                                ? CachedNetworkImage(
+                                    imageUrl: news[index].imageUrl!,
+                                    placeholder: (context, url) => const CupertinoActivityIndicator(),
+                                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                        ),
+                        subtitle: news[index].teaser != null
+                            ? Text(
+                                news[index].teaser!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                        isThreeLine: news[index].teaser != null,
+                        onTap: () {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (context) {
+                              Size size = MediaQuery.of(context).size;
+                              return Scaffold(
+                                body: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (news[index].imageUrl != null)
+                                        GestureDetector(
+                                          onTap: () {
+                                            showImageDetailDialog(context, news[index].imageUrl!);
+                                          },
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(maxHeight: size.height / 2, minWidth: size.width),
+                                            child: ClipRect(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  image: DecorationImage(
+                                                    image: CachedNetworkImageProvider(news[index].imageUrl!),
+                                                    fit: BoxFit.cover,
                                                   ),
                                                 ),
-                                              );
-                                            },
-                                          );
-                                        },
+                                                child: BackdropFilter(
+                                                  filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                                                  child: CachedNetworkImage(
+                                                    width: size.width,
+                                                    fit: BoxFit.contain,
+                                                    imageUrl: news[index].imageUrl!,
+                                                    placeholder: (context, url) => const CupertinoActivityIndicator(),
+                                                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      SizedBox(height: news[index].imageUrl != null ? 8.0 : 24),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 24.0, left: 16),
+                                        child: Text(
+                                          DateFormat('dd.MM.yy HH:mm').format(news[index].created),
+                                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+                                        child: Text(
+                                          news[index].title,
+                                          style: Theme.of(context).textTheme.headlineMedium,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 128.0, top: 16),
+                                        child: HtmlWidget(
+                                          news[index].content,
+                                          onTapUrl: (url) {
+                                            launchUrl(Uri.parse(url));
+                                            return true;
+                                          },
+                                          textStyle: Theme.of(context).textTheme.bodyLarge,
+                                          onTapImage: (p0) {
+                                            showImageDetailDialog(context, p0.sources.first.url);
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ));
-                      }
-                    ),
+                              );
+                            },
+                          ));
+                        }),
                   );
 
                   if (index == 0 || news[index].created.day != news[index - 1].created.day || news[index].created.month != news[index - 1].created.month) {
@@ -373,15 +360,14 @@ class _NewsPageState extends State<NewsPage> {
                           padding: const EdgeInsets.only(left: 16.0, top: 8, bottom: 2),
                           child: Text(
                             DateFormat('dd.MM.yy').format(news[index].created),
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                             textAlign: TextAlign.start,
                           ),
                         ),
                         tile
                       ],
                     );
-                  }
-                  else {
+                  } else {
                     return tile;
                   }
                 },
@@ -389,5 +375,36 @@ class _NewsPageState extends State<NewsPage> {
             )
           ],
         ));
+  }
+
+  void showImageDetailDialog(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isClosing = false;
+        return InteractiveViewer(
+          maxScale: 4,
+          child: TapRegion(
+            onTapOutside: (tap) {
+              if (isClosing) {
+                return;
+              }
+              isClosing = true;
+              Navigator.of(context).pop();
+            },
+            child: Center(
+              child: Container(
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  placeholder: (context, url) => const CupertinoActivityIndicator(),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
