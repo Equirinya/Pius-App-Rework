@@ -249,7 +249,7 @@ class _NewsPageState extends State<NewsPage> {
                 itemCount: news.length,
                 itemBuilder: (context, index) {
                   Widget tile = Padding(
-                    padding: news[index].teaser != null ? EdgeInsets.zero : EdgeInsets.only(top: 10.0, bottom: 18),
+                    padding: news[index].teaser != null ? EdgeInsets.zero : const EdgeInsets.only(top: 10.0, bottom: 18),
                     child: ListTile(
                         title: Text(news[index].title,
                             maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
