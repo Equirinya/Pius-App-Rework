@@ -282,7 +282,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
 }
 
 
-void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
+void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh, [Function(List<Stunde> stunden,   String stufe)? customKursSelection]) async {
   List<String> klassen = List.empty(growable: true);
   List<String> oberstufen = List.empty(growable: true);
   List<String> stufen = List.empty(growable: true);
@@ -350,7 +350,11 @@ void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, Vo
                             });
                             List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
                             if (context.mounted) Navigator.pop(context);
-                            showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
+                            if(customKursSelection != null) {
+                              customKursSelection(stunden, oberstufen[i - klassen.length]);
+                            } else {
+                              showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
+                            }
                           }
                         },
                       ),

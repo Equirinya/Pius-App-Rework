@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar/isar.dart';
-import '../connection.dart';
 import '../database.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
@@ -131,12 +130,12 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
             const Divider(
               height: 1,
             ),
-          if (loading ?? false) LinearProgressIndicator(minHeight: 2),
+          if (loading ?? false) const LinearProgressIndicator(minHeight: 2),
           if(loading == null) Container(
             width: double.infinity,
             color: Theme.of(context).colorScheme.errorContainer,
             alignment: Alignment.center,
-            child: Text("Konnte Vertretungsplan nicht aktualisieren"),
+            child: const Text("Konnte Vertretungsplan nicht aktualisieren"),
           ),
           Expanded(
             child: ListView(

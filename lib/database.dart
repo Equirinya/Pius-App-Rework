@@ -67,6 +67,16 @@ class Stunde {
 }
 
 @Collection()
+class News{
+  late Id id;
+  late String title;
+  late String content;
+  String? teaser;
+  late DateTime created;
+  String? imageUrl;
+}
+
+@Collection()
 class ColorPalette {
   late Id id = Isar.autoIncrement;
   bool fromSeed = true;

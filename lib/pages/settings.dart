@@ -12,6 +12,7 @@ import 'package:flex_color_picker/flex_color_picker.dart';
 
 import 'package:isar/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 import '../database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -97,10 +98,17 @@ class _SettingsPageState extends State<SettingsPage> {
             (
               "Login", //TODO make new login settingstype
               [
-                ("Dein Login", "Klicke hier um deinen Login zu ändern", Ionicons.log_in, "-", SettingType.customTap, () async {
-                  await newLogin(context, securePrefs);
-                  widget.refresh();
-                }),
+                (
+                  "Dein Login",
+                  "Klicke hier um deinen Login zu ändern",
+                  Ionicons.log_in,
+                  "-",
+                  SettingType.customTap,
+                  () async {
+                    await newLogin(context, securePrefs);
+                    widget.refresh();
+                  }
+                ),
               ]
             ),
             (
@@ -112,7 +120,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   Ionicons.refresh_outline,
                   "background",
                   SettingType.boolWithCallback,
-                  (true, (value) {
+                  (
+                    true,
+                    (value) {
                       enableBackground(value);
                     }
                   )
@@ -123,20 +133,26 @@ class _SettingsPageState extends State<SettingsPage> {
                   Ionicons.refresh_circle_outline,
                   "vertretungUpdateDuration",
                   SettingType.selectionWithCallback,
-                  (durations.keys.toList(), 2, () {
-                    configureBackgroundFetch();
-                  }),
+                  (
+                    durations.keys.toList(),
+                    2,
+                    () {
+                      configureBackgroundFetch();
+                    }
+                  ),
                 ),
                 (
                   "Vertretungsplan Update Wifi Only",
                   "Aktualisiere Vertretungsplan nur bei WLAN Verbindung.",
                   Ionicons.wifi_outline,
                   "vertretungUpdateWifi",
-                SettingType.boolWithCallback,
-                (false, (value) {
-                  configureBackgroundFetch();
-                }
-                )
+                  SettingType.boolWithCallback,
+                  (
+                    false,
+                    (value) {
+                      configureBackgroundFetch();
+                    }
+                  )
                 ),
               ]
             ),
@@ -168,24 +184,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ]
               ),
             (
-              "Stundenplan und Termine Aktualisierung",
+              "Stundenplan Aktualisierung",
               [
-                (
-                  "Pius-Termine Update Intervall",
-                  "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
-                  Ionicons.refresh_circle_outline,
-                  "termineUpdateDuration",
-                  SettingType.selection,
-                  (durations.keys.toList(), 8),
-                ),
-                (
-                  "Termine Update Wifi Only",
-                  "Aktualisiere Termine nur bei WLAN Verbindung.",
-                  Ionicons.wifi_outline,
-                  "termineUpdateWifi",
-                  SettingType.boolDefaultTrue,
-                  null,
-                ),
                 (
                   "Stundenplan Update Intervall",
                   "Der Stundenplan wird bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
@@ -204,6 +204,49 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ]
             ),
+            (
+              "Termine Aktualisierung",
+              [
+                (
+                  "Pius-Termine Update Intervall",
+                  "Die Pius Termine werden bei App Start aktualisiert wenn die letzte Aktualisierung länger als das Intervall her ist.",
+                  Ionicons.refresh_circle_outline,
+                  "termineUpdateDuration",
+                  SettingType.selection,
+                  (durations.keys.toList(), 8),
+                ),
+                (
+                  "Termine Update Wifi Only",
+                  "Aktualisiere Termine nur bei WLAN Verbindung.",
+                  Ionicons.wifi_outline,
+                  "termineUpdateWifi",
+                  SettingType.boolDefaultTrue,
+                  null,
+                ),
+              ]
+            ),
+            (
+              "News Aktualisierung",
+              [
+                (
+                  "News Update bei App Start",
+                  "Aktualisiere News bei App Start",
+                  Ionicons.refresh_circle_outline,
+                  "newsUpdateStart",
+                  SettingType.boolDefaultTrue,
+                  null,
+                ),
+                if(prefs.getBool("newsUpdateStart") ?? true)(
+                  "News Update Wifi Only",
+                  "Aktualisiere News nur bei WLAN Verbindung automatisch.",
+                  Ionicons.wifi_outline,
+                  "newsUpdateWifi",
+                  SettingType.boolDefaultTrue,
+                  null,
+                ),
+              ]
+            ),
+
           ]
         ),
         (
@@ -243,17 +286,73 @@ class _SettingsPageState extends State<SettingsPage> {
           Ionicons.calendar_outline,
           [
             (
-            "Klasse/Kurs",
-            [
-              (
-              "Ändere Stundenplan",
-              "Ändere die Klasse/die Kurse des Stundenplans",
-              Ionicons.library_outline,
-              "",
-              SettingType.customTap,
-              () => addStundenplan(context, widget.isar, prefs, () {})
-              ),
-            ]
+              "Klasse/Kurs",
+              [
+                (
+                  "Ändere Stundenplan",
+                  "Ändere die Klasse/die Kurse des Stundenplans",
+                  Ionicons.library_outline,
+                  "",
+                  SettingType.customTap,
+                  () => addStundenplan(context, widget.isar, prefs, () {})
+                ),
+                (
+                  "Exportiere Kurse",
+                  "Exportiere Kurse um sie auf einem anderen Gerät zu importieren",
+                  Icons.ios_share_rounded,
+                  "",
+                  SettingType.customTap,
+                  () async {
+                    List<String> kurse = widget.isar.stundes.where().nameProperty().findAllSync().toSet().toList();
+                    Share.share(kurse.join(",\n"));
+                  }
+                ),
+                (
+                  "Importiere Kurse",
+                  "Importiere Kurse aus einer Text Liste",
+                  Icons.system_update,
+                  "",
+                  SettingType.customTap,
+                  () async {
+                    addStundenplan(context, widget.isar, prefs, () {}, (stunden, stufe) async {
+                      String? result = await showDialog(
+                          context: context,
+                          builder: (context) {
+                            TextEditingController controller = TextEditingController();
+                            return AlertDialog(
+                              icon: const Icon(Icons.system_update),
+                              title: const Text("Kurse importieren"),
+                              content: TextField(
+                                controller: controller,
+                                maxLines: null,
+                                decoration: const InputDecoration(
+                                  labelText: "Kurse",
+                                  hintText: "Füge die Kurse hier ein, getrennt durch Kommas oder Zeilenumbrüche.",
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                    child: const Text("Abbrechen")),
+                                TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop(controller.text);
+                                    },
+                                    child: const Text("Importieren"))
+                              ],
+                            );
+                          });
+                      if (result != null) {
+                        List<String> kurse = result.split(RegExp(r'[,|\n]'));
+                        List<Stunde> toAdd = stunden.where((element) => kurse.contains(element.name)).toList();
+                        setStundenplan(toAdd, stufe, true, widget.isar, prefs, () { });
+                      }
+                    },);
+                  }
+                ),
+              ]
             ),
             (
               "Inhalt",
@@ -359,6 +458,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   SettingType.string,
                   "https://www.pius-gymnasium.de/pius-kalender.ics"
                 ),
+                (
+                  "Pius News-Archiv Website",
+                  "Die URL des Pius News-Archivs",
+                  Ionicons.globe_outline,
+                  "website_news_termine",
+                  SettingType.string,
+                  "https://www.pius-gymnasium.de/wp-json/wp/v2/posts"
+                ),
               ]
             ),
           ]
@@ -380,12 +487,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   "Entwickler: Jacob Peters\n\nPius-Logo: Benedikt Seidl\n\nSyncfusion libraries licensed under the Syncfusion Community License"
                 ),
                 (
-                "Kontakt",
-                "Schreibe mir für Feedback, Bug Reports oder Feature Requests",
-                Ionicons.mail_outline,
-                "-",
-                SettingType.customTap,
-                () => launchUrl(Uri.parse("mailto:equirinya@gmail.com"))
+                  "Kontakt",
+                  "Schreibe mir für Feedback, Bug Reports oder Feature Requests",
+                  Ionicons.mail_outline,
+                  "-",
+                  SettingType.customTap,
+                  () => launchUrl(Uri.parse("mailto:equirinya@gmail.com"))
                 ),
                 (
                   "Datenschutz",
@@ -604,120 +711,118 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-
 Future<void> newLogin(BuildContext context, FlutterSecureStorage securePrefs) => showDialog(
-  context: context,
-  builder: (context) {
-    TextEditingController usernameController = TextEditingController();
-    TextEditingController passwordController = TextEditingController();
+      context: context,
+      builder: (context) {
+        TextEditingController usernameController = TextEditingController();
+        TextEditingController passwordController = TextEditingController();
 
-    int state = 0;
-    String error = "";
+        int state = 0;
+        String error = "";
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return AlertDialog(
-          icon: const Icon(Icons.account_circle),
-          title: const Text("Neuer Login"),
-          content: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(
-                  labelText: "Benutzername",
-                ),
-              ),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: "Passwort",
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: SizedBox(
-                  height: 32,
-                  child: IndexedStack(
-                    index: state,
-                    alignment: Alignment.center,
-                    children: [
-                      Text(error),
-                      const CupertinoActivityIndicator(),
-                      Icon(
-                        Icons.check,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              icon: const Icon(Icons.account_circle),
+              title: const Text("Neuer Login"),
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: "Benutzername",
+                    ),
                   ),
-                ),
-              )
-            ],
-          ),
-          actions: [
-            TextButton(
-                style: TextButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primaryContainer),
-                onPressed: state == 0
-                    ? () async {
-                  if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-                    setState(() {
-                      state = 0;
-                      error = "Bitte fülle alle Felder aus.";
-                    });
-                    return;
-                  }
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      labelText: "Passwort",
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SizedBox(
+                      height: 32,
+                      child: IndexedStack(
+                        index: state,
+                        alignment: Alignment.center,
+                        children: [
+                          Text(error),
+                          const CupertinoActivityIndicator(),
+                          Icon(
+                            Icons.check,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                ],
+              ),
+              actions: [
+                TextButton(
+                    style: TextButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primaryContainer),
+                    onPressed: state == 0
+                        ? () async {
+                            if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
+                              setState(() {
+                                state = 0;
+                                error = "Bitte fülle alle Felder aus.";
+                              });
+                              return;
+                            }
 
-                  setState(() {
-                    state = 1;
-                  });
-                  String lastUsername = await securePrefs.read(key: "username") ?? "";
-                  String lastPassword = await securePrefs.read(key: "password") ?? "";
-                  await securePrefs.write(key: "username", value: usernameController.text);
-                  await securePrefs.write(key: "password", value: passwordController.text);
+                            setState(() {
+                              state = 1;
+                            });
+                            String lastUsername = await securePrefs.read(key: "username") ?? "";
+                            String lastPassword = await securePrefs.read(key: "password") ?? "";
+                            await securePrefs.write(key: "username", value: usernameController.text);
+                            await securePrefs.write(key: "password", value: passwordController.text);
 
-                  try {
-                    await checkCredentials();
-                  } on AuthorizationException catch (e) {
-                    setState(() {
-                      state = 0;
-                      error = e.msg;
-                    });
-                    securePrefs.write(key: "username", value: lastUsername);
-                    securePrefs.write(key: "password", value: lastPassword);
-                    return;
-                  } catch (e) {
-                    setState(() {
-                      state = 0;
-                      error = "Unerwarteter Fehler: ${e.toString()}";
-                    });
-                    securePrefs.write(key: "username", value: lastUsername);
-                    securePrefs.write(key: "password", value: lastPassword);
-                    return;
-                  }
-                  setState(() {
-                    state = 2;
-                  });
-                  await Future.delayed(const Duration(seconds: 1));
+                            try {
+                              await checkCredentials();
+                            } on AuthorizationException catch (e) {
+                              setState(() {
+                                state = 0;
+                                error = e.msg;
+                              });
+                              securePrefs.write(key: "username", value: lastUsername);
+                              securePrefs.write(key: "password", value: lastPassword);
+                              return;
+                            } catch (e) {
+                              setState(() {
+                                state = 0;
+                                error = "Unerwarteter Fehler: ${e.toString()}";
+                              });
+                              securePrefs.write(key: "username", value: lastUsername);
+                              securePrefs.write(key: "password", value: lastPassword);
+                              return;
+                            }
+                            setState(() {
+                              state = 2;
+                            });
+                            await Future.delayed(const Duration(seconds: 1));
 
-                  Navigator.of(context).pop();
-                }
-                    : null,
-                child: const Text("Einloggen")),
-            TextButton(
-                onPressed: state == 0
-                    ? () {
-                  Navigator.of(context).pop();
-                }
-                    : null,
-                child: const Text("Abbrechen"))
-          ],
+                            Navigator.of(context).pop();
+                          }
+                        : null,
+                    child: const Text("Einloggen")),
+                TextButton(
+                    onPressed: state == 0
+                        ? () {
+                            Navigator.of(context).pop();
+                          }
+                        : null,
+                    child: const Text("Abbrechen"))
+              ],
+            );
+          },
         );
       },
     );
-  },
-);
-
 
 class ColorPaletteSelectionTile extends StatefulWidget {
   const ColorPaletteSelectionTile({super.key, required this.isar, required this.prefs});

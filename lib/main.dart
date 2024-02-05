@@ -1,4 +1,5 @@
 import 'package:PiusApp/background.dart';
+import 'package:PiusApp/pages/news.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
@@ -26,11 +27,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 //TODO fix overlap in update stundenplan
 //TODO Increment klasse nach sommerferien
 
+//TODO shrink calendar header and add buttons yourself than add extra refresh button
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final Isar isar = await Isar.open(
-    [VertretungSchema, StundeSchema, ColorPaletteSchema],
+    [VertretungSchema, StundeSchema, ColorPaletteSchema, NewsSchema],
     directory: (await getApplicationSupportDirectory()).path,
   );
 
@@ -300,6 +303,7 @@ class _OuterPageState extends State<OuterPage> {
             calendarLoading: calendarLoadingNotifier,
           ),
           VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
+          NewsPage(isar: widget.isar),
           SettingsPage(
               isar: widget.isar,
               refresh: () {
@@ -330,6 +334,11 @@ class _OuterPageState extends State<OuterPage> {
             selectedIcon: Icon(Ionicons.reorder_four),
             icon: Icon(Ionicons.reorder_four),
             label: "Vertretungsplan",
+          ),
+          NavigationDestination(
+            selectedIcon: Icon(Ionicons.newspaper),
+            icon: Icon(Ionicons.newspaper_outline),
+            label: "News",
           ),
           NavigationDestination(
             selectedIcon: Icon(Ionicons.settings),
