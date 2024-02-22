@@ -80,7 +80,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
     return SafeArea(
       child: Scaffold(
           appBar: AppBar(
-            title: Text("${DateFormat("LLLL", "DE_de").format(controller.displayDate ?? DateTime.now())} ${controller.displayDate?.year.toString().substring(2) ?? ""}"),
+            title: Text(
+              "${DateFormat("LLLL", "DE_de").format(controller.displayDate ?? DateTime.now())} ${controller.displayDate?.year.toString().substring(2) ?? ""}",
+              overflow: TextOverflow.fade,
+            ),
             surfaceTintColor: Colors.transparent,
             actions: [
               IconButton(
