@@ -44,6 +44,8 @@
 	<true/>
 	<key>UIStatusBarHidden</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Die App verwendet das Mikrofon nie.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
