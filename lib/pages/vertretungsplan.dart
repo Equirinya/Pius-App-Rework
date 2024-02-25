@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'dart:io' show Platform;
+
 class VertretungsplanPage extends StatefulWidget {
   const VertretungsplanPage({super.key, required this.isar, required this.loadingNotifier, required this.refresh});
 
@@ -55,6 +57,11 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
       else
         return split[0];
     }).toList();
+
+    double width = MediaQuery.of(context).size.width;
+    double horizontalPadding = (Platform.isWindows || Platform.isMacOS) ?
+    width > 700 ? (width - 700)/2 +32 : 32
+        : 8;
 
     return Scaffold(
       appBar: AppBar(
@@ -139,7 +146,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.only(left: 8, right: 8, top: 12, bottom: 72),
+              padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, top: 12, bottom: 72),
               children: [
                 Text("Tickertext:\n${prefs.getString("ticker") ?? ""}"),
                 for (DateTime tag in tage) ...[
@@ -206,8 +213,10 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
   }
 }
 
+List<double> defaultColumnWidths = const [45, 72, 52, 60, 40];
+
 Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
-    {List<double> columnWidths = const [45, 72, 52, 60, 40], required ThemeData theme, bool shorten = true, double fontSize = 12}) {
+    {List<double>? columnWidths, required ThemeData theme, bool shorten = true, double fontSize = 12}) {
   List<String> headers =
       shorten ? ["Stunde", "Art", "Kurs", "Raum", "akt.", "Bemerkung"] : ["Stunde(n)", "Art", "Fach / Kurs", "Raum", "Lehrkraft aktuell", "Bemerkung"];
 
@@ -220,6 +229,7 @@ Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
   List<Color> textColors = [theme.colorScheme.surface, theme.colorScheme.inverseSurface]..sort((a, b) => a.computeLuminance().compareTo(b.computeLuminance()));
   Color lightTextColor = textColors.last;
   Color darkTextColor = textColors.first;
+  columnWidths ??= defaultColumnWidths;
 
   return Column(
     mainAxisSize: MainAxisSize.min,
@@ -276,7 +286,7 @@ Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
         Table(
             border: TableBorder(verticalInside: BorderSide(color: backgroundColor, width: 1), top: BorderSide(color: backgroundColor, width: 1)),
             columnWidths: <int, TableColumnWidth>{
-              for (int i = 0; i < columnWidths.length; i++) i: FixedColumnWidth(columnWidths[i])
+              for (int i = 0; i < columnWidths.length; i++) i: FixedColumnWidth(columnWidths[i]),
             },
             children: [
               TableRow(

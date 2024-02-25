@@ -15,6 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
+import 'dart:io' show Platform;
+
 //on load load stundenplan dateien if namen unterschiedlich
 //on add nur bis nächste sommerferien
 
@@ -47,6 +49,8 @@ class _StundenplanPageState extends State<StundenplanPage> {
   void initState() {
     SharedPreferences.getInstance().then((value) {
       prefs = value;
+      int? stundenplanView = prefs.getInt("stundenplanView");
+      if(stundenplanView == null) prefs.setInt("stundenplanView", (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ? 2 : 1);
       view = prefs.getInt("stundenplanView") == 0
           ? CalendarView.day
           : prefs.getInt("stundenplanView") == 2
@@ -172,9 +176,12 @@ class _StundenplanPageState extends State<StundenplanPage> {
                       onTap: isVertretung
                           ? () => showDialog(
                                 builder: (context) {
+                                  double width = MediaQuery.of(context).size.width;
                                   return Center(
                                     child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
+                                      padding: EdgeInsets.symmetric(horizontal:  (Platform.isWindows || Platform.isMacOS) ?
+                                      width > 700 ? (width - 700)/2 +32 : 32
+                                          : 8),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
                                         child: klassenVertretungsBlock([Vertretung.fromMap(vertretungsMap)], theme: Theme.of(context)),

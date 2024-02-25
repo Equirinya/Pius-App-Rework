@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui';
 import 'dart:io' show Platform;
 
@@ -8,6 +9,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:intl/intl.dart';
 import 'package:ionicons/ionicons.dart';
@@ -16,7 +18,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart';
-import 'package:html/dom.dart' as DOM;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../database.dart';
@@ -34,6 +35,7 @@ class _NewsPageState extends State<NewsPage> {
   bool loading = false;
   bool initialized = false;
   late SharedPreferences prefs;
+  bool isShowingImage = false;
 
   @override
   initState() {
@@ -259,7 +261,7 @@ class _NewsPageState extends State<NewsPage> {
                           borderRadius: BorderRadius.circular(8.0),
                           child: SizedBox(
                             height: double.infinity,
-                            width: size.width / 4,
+                            width: min(size.width / 4, size.height / 6),
                             child: news[index].imageUrl != null
                                 ? CachedNetworkImage(
                                     imageUrl: news[index].imageUrl!,
@@ -279,7 +281,7 @@ class _NewsPageState extends State<NewsPage> {
                             : null,
                         isThreeLine: news[index].teaser != null,
                         onTap: () {
-                          Navigator.of(context).push(Platform.isIOS ? CupertinoPageRoute(builder: (context) {
+                          Navigator.of(context).push((Platform.isIOS || Platform.isMacOS) ? CupertinoPageRoute(builder: (context) {
                             return CupertinoPageScaffold(
                               navigationBar: const CupertinoNavigationBar(
                                 previousPageTitle: "News",
@@ -291,6 +293,9 @@ class _NewsPageState extends State<NewsPage> {
                           ) : MaterialPageRoute(
                             builder: (context) {
                               return Scaffold(
+                                appBar: Platform.isAndroid ? null : AppBar(
+                                  title: const Text('News'),
+                                ),
                                 body: buildNewsDetailPage(news, index, context),
                               );
                             },
@@ -325,75 +330,85 @@ class _NewsPageState extends State<NewsPage> {
 
   Widget buildNewsDetailPage(List<News> news, int index, BuildContext context) {
     Size size = MediaQuery.of(context).size;
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (news[index].imageUrl != null)
-            GestureDetector(
-              onTap: () {
-                showImageDetailDialog(context, news[index].imageUrl!);
-              },
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: size.height / 2, minWidth: size.width),
-                child: ClipRect(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: CachedNetworkImageProvider(news[index].imageUrl!),
-                        fit: BoxFit.cover,
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKeyEvent: (event) {
+        if (event.logicalKey == LogicalKeyboardKey.escape && !isShowingImage) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (news[index].imageUrl != null)
+              GestureDetector(
+                onTap: () {
+                  showImageDetailDialog(context, news[index].imageUrl!);
+                },
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: size.height / 2, minWidth: size.width),
+                  child: ClipRect(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(news[index].imageUrl!),
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
-                      child: CachedNetworkImage(
-                        width: size.width,
-                        fit: BoxFit.contain,
-                        imageUrl: news[index].imageUrl!,
-                        placeholder: (context, url) => const CupertinoActivityIndicator(),
-                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                        child: CachedNetworkImage(
+                          width: size.width,
+                          fit: BoxFit.contain,
+                          imageUrl: news[index].imageUrl!,
+                          placeholder: (context, url) => const CupertinoActivityIndicator(),
+                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
+            SizedBox(height: news[index].imageUrl != null ? 8.0 : 24),
+            Padding(
+              padding: const EdgeInsets.only(top: 24.0, left: 16),
+              child: Text(
+                DateFormat('dd.MM.yy HH:mm').format(news[index].created),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
             ),
-          SizedBox(height: news[index].imageUrl != null ? 8.0 : 24),
-          Padding(
-            padding: const EdgeInsets.only(top: 24.0, left: 16),
-            child: Text(
-              DateFormat('dd.MM.yy HH:mm').format(news[index].created),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+              child: Text(
+                news[index].title,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
-            child: Text(
-              news[index].title,
-              style: Theme.of(context).textTheme.headlineMedium,
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 128.0, top: 16),
+              child: HtmlWidget(
+                news[index].content,
+                onTapUrl: (url) {
+                  launchUrl(Uri.parse(url));
+                  return true;
+                },
+                textStyle: Theme.of(context).textTheme.bodyLarge,
+                onTapImage: (p0) {
+                  showImageDetailDialog(context, p0.sources.first.url);
+                },
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 128.0, top: 16),
-            child: HtmlWidget(
-              news[index].content,
-              onTapUrl: (url) {
-                launchUrl(Uri.parse(url));
-                return true;
-              },
-              textStyle: Theme.of(context).textTheme.bodyLarge,
-              onTapImage: (p0) {
-                showImageDetailDialog(context, p0.sources.first.url);
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  void showImageDetailDialog(BuildContext context, String url) {
-    showDialog(
+  void showImageDetailDialog(BuildContext context, String url) async {
+    isShowingImage = true;
+    await showDialog(
       context: context,
       builder: (context) {
         bool isClosing = false;
@@ -406,6 +421,7 @@ class _NewsPageState extends State<NewsPage> {
               }
               isClosing = true;
               Navigator.of(context).pop();
+              isClosing = false;
             },
             child: Center(
               child: Container(
@@ -421,5 +437,7 @@ class _NewsPageState extends State<NewsPage> {
         );
       },
     );
+    await Future.delayed(const Duration(milliseconds: 200));
+    isShowingImage = false;
   }
 }

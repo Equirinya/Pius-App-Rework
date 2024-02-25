@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:io' show Platform;
 import 'package:PiusApp/background.dart';
 import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:app_settings/app_settings.dart';
@@ -111,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ]
             ),
-            (
+            if(Platform.isAndroid || Platform.isIOS)(
               "Hintergrundaktualisierung",
               [
                 (
@@ -156,7 +157,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ]
             ),
-            if (prefs.getBool("background") ?? true)
+            if (prefs.getBool("background") ?? true && (Platform.isAndroid || Platform.isIOS))
               (
                 "Benachrichtigungen",
                 [

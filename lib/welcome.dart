@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:io' show Platform;
 
 import 'package:PiusApp/background.dart';
 import 'package:PiusApp/connection.dart';
@@ -8,6 +9,7 @@ import 'package:PiusApp/database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar/isar.dart';
@@ -34,6 +36,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
   final PageController _pageController = PageController();
   TextEditingController usernameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
+  FocusNode passwordFocus = FocusNode();
 
   int loginState = 0;
   String loginError = "";
@@ -88,37 +91,48 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [ //TODO set column size to min and wrap with scrollview
+    Size size = MediaQuery.of(context).size;
+    final List<Widget> pages = [
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
           mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              margin: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ClipRect(
-                child: Align(
-                  widthFactor: 0.8,
-                  heightFactor: 0.8,
-                  child: ColorFiltered(
-                    colorFilter: ColorFilter.mode(Theme.of(context).colorScheme.primary, BlendMode.srcIn),
-                    child: Image.asset('assets/icon/icon_transparent.png'), //TODO fix hole in logo
-                  ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      constraints: BoxConstraints(maxHeight: size.height * 0.4, maxWidth: size.width * 0.4),
+                      child: ClipRect(
+                        child: Align(
+                          widthFactor: 0.8,
+                          heightFactor: 0.8,
+                          child: ColorFiltered(
+                            colorFilter: ColorFilter.mode(Theme.of(context).colorScheme.primary, BlendMode.srcIn),
+                            child: Image.asset('assets/icon/icon_transparent.png'), //TODO fix hole in logo
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text("Pius App", style: Theme.of(context).textTheme.displayLarge),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text("Willkommen zur neuen Pius App. Ab sofort Stunden- und Vertretungsplan in einem! Offline verfügbar und im Hintergrund aktualisiert. ",
+                          style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
+                    ),
+                  ],
                 ),
               ),
             ),
-            Text("Pius App", style: Theme.of(context).textTheme.displayLarge),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text("Willkommen zur neuen Pius App. Ab sofort Stunden- und Vertretungsplan in einem! Offline verfügbar und im Hintergrund aktualisiert. ",
-                  style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-            ),
-            const Expanded(child: SizedBox()),
             Padding(
               padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16),
               child: SizedBox(
@@ -141,98 +155,70 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8, top: 24),
-              child: Icon(
-                Icons.account_circle,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            Text("Login", style: Theme.of(context).textTheme.headlineLarge),
-            SizedBox(height: 8),
-            Text("Bitte logge dich mit deinem Pius-Account ein. Die Daten werden verschlüsselt und nur auf deinem Gerät gespeichert.",
-                style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-            TextField(
-              controller: usernameController,
-              decoration: const InputDecoration(
-                labelText: "Benutzername",
-              ),
-            ),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Passwort",
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                height: 32,
-                child: IndexedStack(
-                  index: loginState,
-                  alignment: Alignment.center,
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(loginError),
-                    const CupertinoActivityIndicator(),
-                    Icon(
-                      Icons.check,
-                      color: Theme.of(context).colorScheme.primary,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8, top: 24),
+                      child: Icon(
+                        Icons.account_circle,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    Text("Login", style: Theme.of(context).textTheme.headlineLarge),
+                    SizedBox(height: 8),
+                    Text("Bitte logge dich mit deinem Pius-Account ein. Die Daten werden verschlüsselt und nur auf deinem Gerät gespeichert.",
+                        style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
+                    TextField(
+                      controller: usernameController,
+                      decoration: const InputDecoration(
+                        labelText: "Benutzername",
+                      ),
+                      onSubmitted: (String value) {
+                        passwordFocus.requestFocus();
+                      },
+                    ),
+                    TextField(
+                      focusNode: passwordFocus,
+                      controller: passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: "Passwort",
+                      ),
+                      onSubmitted: (String value) {
+                        saveLogin();
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        height: 32,
+                        child: IndexedStack(
+                          index: loginState,
+                          alignment: Alignment.center,
+                          children: [
+                            Text(loginError),
+                            const CupertinoActivityIndicator(),
+                            Icon(
+                              Icons.check,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            const Expanded(child: SizedBox()),
             FilledButton.tonal(
               onPressed: loginState == 0 || loginState == 2
-                  ? () async {
-                      if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-                        setState(() {
-                          loginState = 0;
-                          loginError = "Bitte fülle alle Felder aus.";
-                        });
-                        return;
-                      }
-
-                      setState(() {
-                        loginState = 1;
-                      });
-                      String lastUsername = await securePrefs.read(key: "username") ?? "";
-                      String lastPassword = await securePrefs.read(key: "password") ?? "";
-                      await securePrefs.write(key: "username", value: usernameController.text);
-                      await securePrefs.write(key: "password", value: passwordController.text);
-                      //print(passwordController.text);
-                      //print(await securePrefs.read(key: "password"));
-
-                      try {
-                        await checkCredentials();
-                      } on AuthorizationException catch (e) {
-                        setState(() {
-                          loginState = 0;
-                          loginError = e.msg;
-                        });
-                        securePrefs.write(key: "username", value: lastUsername);
-                        securePrefs.write(key: "password", value: lastPassword);
-                        return;
-                      } catch (e) {
-                        setState(() {
-                          loginState = 0;
-                          loginError = "Unerwarteter Fehler: ${e.toString()}";
-                        });
-                        securePrefs.write(key: "username", value: lastUsername);
-                        securePrefs.write(key: "password", value: lastPassword);
-                        return;
-                      }
-                      setState(() {
-                        loginState = 2;
-                        loggedIn = true;
-                      });
-                      await Future.delayed(const Duration(seconds: 1));
-                      _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-                    }
+                  ? saveLogin
                   : null,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -312,7 +298,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                                     listSetState(() {
                                       stufenLoading = false;
                                     });
-                                    _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                    if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                    else startApp(context);
                                   } else {
                                     listSetState(() {
                                       stufenLoading = true;
@@ -324,7 +311,10 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                                     listSetState(() {
                                       stufenLoading = false;
                                     });
-                                    if (courseSelected) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                    if (courseSelected) {
+                                      if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                      else startApp(context);
+                                    }
                                   }
                                 },
                               ),
@@ -357,7 +347,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                                       setState(() {
                                         courseSelected = true;
                                       });
-                                      _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                      if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                                      else startApp(context);
                                     },
                                     child: const Text("Verstanden, weiter")),
                                 TextButton(
@@ -375,7 +366,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
             ),
           ),
         ),
-      if (loggedIn && courseSelected)
+      if (loggedIn && courseSelected && (Platform.isIOS || Platform.isAndroid) )
         Scaffold(
           body: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -399,8 +390,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                     OutlinedButton(
                       onPressed: () {
                         prefs.setBool("showNotifications", false);
-                        prefs.setBool("initialized", true);
-                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+                        startApp(context);
                         configureBackgroundFetch();
                       },
                       child: const Padding(
@@ -418,9 +408,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                           return;
                         }
                         prefs.setBool("showNotifications", true);
-                        prefs.setBool("initialized", true);
                         configureBackgroundFetch();
-                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+                        startApp(context);
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(16.0),
@@ -469,5 +458,56 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
         ),
       ),
     );
+  }
+
+  saveLogin() async {
+              if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
+                setState(() {
+                  loginState = 0;
+                  loginError = "Bitte fülle alle Felder aus.";
+                });
+                return;
+              }
+
+              setState(() {
+                loginState = 1;
+              });
+              String lastUsername = await securePrefs.read(key: "username") ?? "";
+              String lastPassword = await securePrefs.read(key: "password") ?? "";
+              await securePrefs.write(key: "username", value: usernameController.text);
+              await securePrefs.write(key: "password", value: passwordController.text);
+              //print(passwordController.text);
+              //print(await securePrefs.read(key: "password"));
+
+              try {
+                await checkCredentials();
+              } on AuthorizationException catch (e) {
+                setState(() {
+                  loginState = 0;
+                  loginError = e.msg;
+                });
+                securePrefs.write(key: "username", value: lastUsername);
+                securePrefs.write(key: "password", value: lastPassword);
+                return;
+              } catch (e) {
+                setState(() {
+                  loginState = 0;
+                  loginError = "Unerwarteter Fehler: ${e.toString()}";
+                });
+                securePrefs.write(key: "username", value: lastUsername);
+                securePrefs.write(key: "password", value: lastPassword);
+                return;
+              }
+              setState(() {
+                loginState = 2;
+                loggedIn = true;
+              });
+              await Future.delayed(const Duration(seconds: 1));
+              _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+            }
+
+  void startApp(BuildContext context) {
+    prefs.setBool("initialized", true);
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
   }
 }

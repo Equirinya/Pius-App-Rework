@@ -21,13 +21,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'dart:io' show Platform;
+
 //TODO home screen widgets
 //TODO app badge?
 
 //TODO fix overlap in update stundenplan
 //TODO Increment klasse nach sommerferien
 
-//TODO shrink calendar header and add buttons yourself than add extra refresh button
+//TODO google calendar
+//TODO qr code
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,18 +46,20 @@ void main() async {
     timeDilation = 1.0;
   }
 
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  if(Platform.isIOS || Platform.isAndroid) {
+    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 // initialise the plugin. app_icon needs to be a added as a drawable resource to the Android head project
-  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
-  const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
-    requestSoundPermission: false,
-    requestBadgePermission: false,
-    requestAlertPermission: false,);
-  const InitializationSettings initializationSettings =
-      InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
+    const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
+      requestSoundPermission: false,
+      requestBadgePermission: false,
+      requestAlertPermission: false,);
+    const InitializationSettings initializationSettings =
+    InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  configureBackgroundFetch();
+    configureBackgroundFetch();
+  }
 
   runApp(MyApp(
     isar: isar,
