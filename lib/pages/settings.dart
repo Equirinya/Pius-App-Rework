@@ -1,11 +1,17 @@
+import 'dart:convert';
 import 'dart:math';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
+import 'dart:ui';
 import 'package:PiusApp/background.dart';
 import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
@@ -13,6 +19,7 @@ import 'package:flex_color_picker/flex_color_picker.dart';
 
 import 'package:isar/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:share_plus/share_plus.dart';
 import '../database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -252,7 +259,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         (
           "Anzeige",
-          "Dunkles Farbschema, dynamische Farben, Abkürzungen",
+          "Farbschema, Hell/Dunkel, Abkürzungen",
           Ionicons.color_palette,
           [
             (
@@ -298,15 +305,111 @@ class _SettingsPageState extends State<SettingsPage> {
                   () => addStundenplan(context, widget.isar, prefs, () {})
                 ),
                 (
-                  "Exportiere Kurse",
+                  "Teile Kurse",
                   "Exportiere Kurse um sie auf einem anderen Gerät zu importieren",
-                  Icons.ios_share_rounded,
+                  Icons.qr_code_rounded,
                   "",
                   SettingType.customTap,
                   () async {
                     List<String> kurse = widget.isar.stundes.where().nameProperty().findAllSync().toSet().toList();
-                    Share.share(kurse.join(",\n"));
+                    String stufe = prefs.getString("stundenplanStufe") ?? "";
+                    List<Map<String, dynamic>> toExport = [
+                      {"stufe": stufe, "kurse": kurse}
+                    ];
+                    showDialog(
+                        context: context,
+                        builder: (context) {
+                          final qrCode = QrCode.fromData(
+                            data: jsonEncode(toExport),
+                            errorCorrectLevel: QrErrorCorrectLevel.M,
+                          );
+
+                          final qrImage = QrImage(qrCode);
+                          return AlertDialog(
+                            icon: Icon(Icons.qr_code_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
+                            title: Text("Kurse teilen", style: TextStyle(color: Theme.of(context).colorScheme.primary),),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                PrettyQrView(
+                                  qrImage: qrImage,
+                                  decoration: PrettyQrDecoration(
+                                    shape: PrettyQrSmoothSymbol(
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                FilledButton(
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.ios_share_rounded),
+                                      SizedBox(width: 8),
+                                      Text("Teilen"),
+                                    ],
+                                  ),
+                                  onPressed: () async {
+                                    ByteData? imageBytes = await qrImage.toImageAsBytes(
+                                      size: 512,
+                                      format: ImageByteFormat.png,
+                                      // Replace 'PrettyQrDecoration' with your actual decoration class
+                                      decoration: const PrettyQrDecoration(
+                                        shape: PrettyQrSmoothSymbol(
+                                          color: Color.fromARGB(255, 207, 236, 255),
+                                        ),
+                                        image: PrettyQrDecorationImage(image: AssetImage("assets/icon/icon_transparent.png")),
+                                      ),
+                                    );
+
+                                    if (imageBytes == null) {
+                                      if (kDebugMode) print("Error while creating QR Code");
+                                      return;
+                                    }
+
+                                    Uint8List uint8List = imageBytes.buffer.asUint8List();
+                                    // Decode the original image
+                                    img.Image srcImage = img.decodeImage(uint8List)!;
+
+                                    // Create a new image (background) that's slightly larger than the source image
+                                    img.Image bgImage = img.Image(width: srcImage.width + 40, height:srcImage.height + 40, numChannels: 3);
+
+
+                                    img.fillRect(bgImage, x1: 0, y1: 0, x2: bgImage.width, y2: bgImage.height,
+                                        color: img.ColorRgba8(13, 42, 62, 255), radius: 20);
+
+                                    // Composite the original image on top of the background image
+                                    // Position it centered or adjust as needed
+                                    img.compositeImage(bgImage, srcImage,
+                                        dstX: (bgImage.width - srcImage.width) ~/ 2,
+                                        dstY: (bgImage.height - srcImage.height) ~/ 2,);
+
+                                    // Save or use the composite image
+                                    var compositeBytes = img.encodePng(bgImage);
+
+                                    XFile file = XFile.fromData(compositeBytes, mimeType: 'image/png');
+
+                                    Share.shareXFiles(
+                                      [file],
+                                    );
+                                  }
+                                ),
+                              ],
+                            ),
+                          );
+                        });
                   }
+                ),
+                (
+                "Exportiere Kurse",
+                "Exportiere Kurse als Text Liste",
+                Icons.ios_share_rounded,
+                "",
+                SettingType.customTap,
+                    () async {
+                  List<String> kurse = widget.isar.stundes.where().nameProperty().findAllSync().toSet().toList();
+                  Share.share(kurse.join(",\n"));
+                }
                 ),
                 (
                   "Importiere Kurse",

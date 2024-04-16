@@ -18,9 +18,11 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class WelcomeCarousel extends StatefulWidget {
-  const WelcomeCarousel({super.key, required this.isar});
+  const WelcomeCarousel({super.key, required this.isar, required this.lightColorScheme, required this.darkColorScheme});
 
   final Isar isar;
+  final ColorScheme lightColorScheme;
+  final ColorScheme darkColorScheme;
 
   @override
   State<WelcomeCarousel> createState() => _WelcomeCarouselState();
@@ -431,30 +433,35 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
     ];
 
     return Material(
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                children: pages,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SmoothPageIndicator(
-                controller: _pageController,
-                count: pages.length,
-                effect: WormEffect(
-                  activeDotColor: Theme.of(context).colorScheme.primary,
-                  dotColor: Theme.of(context).colorScheme.primaryContainer,
-                  dotHeight: 8,
-                  dotWidth: 8,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.brightness == Brightness.light ? widget.lightColorScheme : widget.darkColorScheme,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  children: pages,
                 ),
               ),
-            )
-          ],
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SmoothPageIndicator(
+                  controller: _pageController,
+                  count: pages.length,
+                  effect: WormEffect(
+                    activeDotColor: Theme.of(context).colorScheme.primary,
+                    dotColor: Theme.of(context).colorScheme.primaryContainer,
+                    dotHeight: 8,
+                    dotWidth: 8,
+                  ),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -508,6 +515,6 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 
   void startApp(BuildContext context) {
     prefs.setBool("initialized", true);
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs)));
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => OuterPage(isar: widget.isar, prefs: prefs, lightColorScheme: widget.lightColorScheme, darkColorScheme: widget.darkColorScheme)));
   }
 }

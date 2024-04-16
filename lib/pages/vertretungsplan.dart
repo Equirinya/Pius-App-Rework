@@ -60,7 +60,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
 
     double width = MediaQuery.of(context).size.width;
     double horizontalPadding = (Platform.isWindows || Platform.isMacOS) ?
-    width > 700 ? (width - 700)/2 +32 : 32
+    width > 750 ? (width - 750)/2 +32 : 32
         : 8;
 
     return Scaffold(

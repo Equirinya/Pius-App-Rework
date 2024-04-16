@@ -3,6 +3,7 @@ import 'package:PiusApp/pages/news.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
+import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -46,16 +47,17 @@ void main() async {
     timeDilation = 1.0;
   }
 
-  if(Platform.isIOS || Platform.isAndroid) {
+  if (Platform.isIOS || Platform.isAndroid) {
     FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 // initialise the plugin. app_icon needs to be a added as a drawable resource to the Android head project
     const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
     const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
       requestSoundPermission: false,
       requestBadgePermission: false,
-      requestAlertPermission: false,);
+      requestAlertPermission: false,
+    );
     const InitializationSettings initializationSettings =
-    InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
+        InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
     configureBackgroundFetch();
@@ -136,6 +138,40 @@ class _MyAppState extends State<MyApp> {
             );
           }
 
+          if (Platform.isWindows) {
+            return FluentApp(
+              debugShowCheckedModeBanner: false,
+              supportedLocales: const [
+                Locale('de'),
+              ],
+              locale: const Locale("de"),
+              localizationsDelegates: const [...GlobalMaterialLocalizations.delegates, SfGlobalLocalizations.delegate],
+              theme: FluentThemeData(
+                brightness: Brightness.light,
+                accentColor: lightColorScheme.primary.toAccentColor(),
+                extensions: [if (vertretungsColors != null) vertretungsColors],
+              ),
+              darkTheme: FluentThemeData(
+                brightness: Brightness.dark,
+                accentColor: lightColorScheme.primary.toAccentColor(),
+                extensions: [if (vertretungsColors != null) vertretungsColors],
+              ),
+              themeMode: ThemeMode.values[darkMode],
+              home: (widget.prefs.getBool("initialized") ?? false)
+                  ? OuterPage(
+                      isar: widget.isar,
+                      prefs: widget.prefs,
+                      lightColorScheme: lightColorScheme,
+                      darkColorScheme: darkColorScheme,
+                    )
+                  : WelcomeCarousel(
+                      isar: widget.isar,
+                      lightColorScheme: lightColorScheme,
+                      darkColorScheme: darkColorScheme,
+                    ),
+            );
+          }
+
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             supportedLocales: const [
@@ -154,7 +190,18 @@ class _MyAppState extends State<MyApp> {
               extensions: [if (vertretungsColors != null) vertretungsColors],
             ),
             themeMode: ThemeMode.values[darkMode],
-            home: (widget.prefs.getBool("initialized") ?? false) ? OuterPage(isar: widget.isar, prefs: widget.prefs) : WelcomeCarousel(isar: widget.isar),
+            home: (widget.prefs.getBool("initialized") ?? false)
+                ? OuterPage(
+                    isar: widget.isar,
+                    prefs: widget.prefs,
+                    lightColorScheme: lightColorScheme,
+                    darkColorScheme: darkColorScheme,
+                  )
+                : WelcomeCarousel(
+                    isar: widget.isar,
+                    lightColorScheme: lightColorScheme,
+                    darkColorScheme: darkColorScheme,
+                  ),
           );
         },
       ),
@@ -205,10 +252,12 @@ class VertretungsColors extends ThemeExtension<VertretungsColors> {
 }
 
 class OuterPage extends StatefulWidget {
-  const OuterPage({super.key, required this.isar, required this.prefs});
+  const OuterPage({super.key, required this.isar, required this.prefs, required this.lightColorScheme, required this.darkColorScheme});
 
   final Isar isar;
   final SharedPreferences prefs;
+  final ColorScheme lightColorScheme;
+  final ColorScheme darkColorScheme;
 
   @override
   State<OuterPage> createState() => _OuterPageState();
@@ -230,8 +279,8 @@ class _OuterPageState extends State<OuterPage> {
 
     String? username = await securePrefs.read(key: "username");
     String? password = await securePrefs.read(key: "password");
-    if(username == null || password == null || username.isEmpty || password.isEmpty) {
-      if(context.mounted) await newLogin(context, securePrefs); //TODO would be better to replace with shortened welcome screen
+    if (username == null || password == null || username.isEmpty || password.isEmpty) {
+      if (context.mounted) await newLogin(context, securePrefs); //TODO would be better to replace with shortened welcome screen
     }
     Connectivity().checkConnectivity().then((value) {
       if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? false) || value == ConnectivityResult.wifi) {
@@ -247,7 +296,7 @@ class _OuterPageState extends State<OuterPage> {
       String vertretungsplanWebsite = await getVertretungsplanWebsite();
       await parseVertretungsplan(vertretungsplanWebsite, widget.isar);
       vertretungsLoadingNotifier.value = false;
-    } on Exception catch (e, s)  {
+    } on Exception catch (e, s) {
       vertretungsLoadingNotifier.value = null;
       if (kDebugMode) {
         print("Error while fetching Vertretungsplan:");
@@ -261,8 +310,9 @@ class _OuterPageState extends State<OuterPage> {
     bool shouldUpdateTermine = forceUpdateStundenPlan ||
         DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0)
             .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
-    bool shouldUpdateStundenplan = forceUpdateStundenPlan || DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
-        .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
+    bool shouldUpdateStundenplan = forceUpdateStundenPlan ||
+        DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
+            .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
     if (shouldUpdateTermine || shouldUpdateStundenplan) {
       calendarLoadingNotifier.value = true;
       bool failed = false;
@@ -298,62 +348,112 @@ class _OuterPageState extends State<OuterPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          StundenplanPage(
-            isar: widget.isar,
-            vertretungsLoading: vertretungsLoadingNotifier,
-            calendarLoading: calendarLoadingNotifier,
-            refreshStundenplan: () => loadCalendarContent(forceUpdateStundenPlan: true),
-            refreshVertretungsplan: loadVertretungsplan,
-          ),
-          VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
-          NewsPage(isar: widget.isar),
-          SettingsPage(
-              isar: widget.isar,
-              refresh: () {
-                Connectivity().checkConnectivity().then((value) {
-                  if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
-                    loadVertretungsplan();
-                  }
-                });
-                loadCalendarContent();
-              }),
-        ],
+    List<Widget> pages = [
+      StundenplanPage(
+        isar: widget.isar,
+        vertretungsLoading: vertretungsLoadingNotifier,
+        calendarLoading: calendarLoadingNotifier,
+        refreshStundenplan: () => loadCalendarContent(forceUpdateStundenPlan: true),
+        refreshVertretungsplan: loadVertretungsplan,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-            widget.prefs.setInt("selectedPage", index);
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.calendar),
-            icon: Icon(Ionicons.calendar_outline),
-            label: "Stundenplan",
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.reorder_four),
-            icon: Icon(Ionicons.reorder_four),
-            label: "Vertretungsplan",
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.newspaper),
-            icon: Icon(Ionicons.newspaper_outline),
-            label: "News",
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.settings),
-            icon: Icon(Ionicons.settings_outline),
-            label: "Einstellungen",
-          ),
-        ],
-      ),
-    );
+      VertretungsplanPage(isar: widget.isar, loadingNotifier: vertretungsLoadingNotifier, refresh: loadVertretungsplan),
+      NewsPage(isar: widget.isar),
+      SettingsPage(
+          isar: widget.isar,
+          refresh: () {
+            Connectivity().checkConnectivity().then((value) {
+              if (!(widget.prefs.getBool("vertretungUpdateWifi") ?? true) || value == ConnectivityResult.wifi) {
+                loadVertretungsplan();
+              }
+            });
+            loadCalendarContent();
+          }),
+    ];
+
+    if (Platform.isWindows) {
+      pages = pages
+          .map((e) => Theme(
+                data: ThemeData.from(
+                  colorScheme: Theme.of(context).colorScheme.brightness == Brightness.light ? widget.lightColorScheme : widget.darkColorScheme,
+                  useMaterial3: true,
+                ),
+                child: e,
+              ))
+          .toList();
+      return NavigationView(
+        pane: NavigationPane(
+          selected: _selectedIndex,
+          onChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+              widget.prefs.setInt("selectedPage", index);
+            });
+          },
+          displayMode: PaneDisplayMode.compact,
+          items: [
+            PaneItem(
+              icon: const Icon(Ionicons.calendar_outline),
+              title: const Text('Stundenplan'),
+              body: pages[0],
+            ),
+            PaneItem(
+              icon: const Icon(Ionicons.reorder_four),
+              title: const Text('Vertretungsplan'),
+              body: pages[1],
+            ),
+            PaneItem(
+              icon: const Icon(Ionicons.newspaper_outline),
+              title: const Text('News'),
+              body: pages[2],
+            ),
+          ],
+          footerItems: [
+            PaneItem(
+              icon: const Icon(Ionicons.settings_outline),
+              title: const Text('Einstellungen'),
+              body: pages[3],
+            ),
+          ]
+        ),
+      );
+    } else {
+      return Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) {
+            setState(() {
+              _selectedIndex = index;
+              widget.prefs.setInt("selectedPage", index);
+            });
+          },
+          destinations: const [
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.calendar),
+              icon: Icon(Ionicons.calendar_outline),
+              label: "Stundenplan",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.reorder_four),
+              icon: Icon(Ionicons.reorder_four),
+              label: "Vertretungsplan",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.newspaper),
+              icon: Icon(Ionicons.newspaper_outline),
+              label: "News",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.settings),
+              icon: Icon(Ionicons.settings_outline),
+              label: "Einstellungen",
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

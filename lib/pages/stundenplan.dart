@@ -147,191 +147,201 @@ class _StundenplanPageState extends State<StundenplanPage> {
               if(widget.calendarLoading.value == true || widget.vertretungsLoading.value == true)
                 const LinearProgressIndicator(minHeight: 2),
               Expanded(
-                child: SfCalendar(
-                  controller: controller,
-                  view: view,
-                  firstDayOfWeek: 1,
-                  showWeekNumber: true,
-                  showTodayButton: true,
-                  headerHeight: 0,
-                  initialDisplayDate: DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day - DateTime.now().weekday + 1),
-                  timeSlotViewSettings: const TimeSlotViewSettings(
-                    timeIntervalHeight: 80,
-                    timeFormat: "HH",
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    scrollbarTheme: ScrollbarThemeData(
+                      thumbVisibility: MaterialStateProperty.all(false),
+                      trackVisibility: MaterialStateProperty.all(false),
+                      thumbColor: MaterialStateProperty.all(Colors.transparent),
+                      trackColor: MaterialStateProperty.all(Colors.transparent),
+                    )
                   ),
-                  allowViewNavigation: true,
-                  allowedViews: const [
-                    CalendarView.day,
-                    CalendarView.workWeek,
-                    CalendarView.week,
-                  ],
-                  appointmentBuilder: (context, calendarAppointmentDetails) {
-                    Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
-                    bool isTermin = (appointment.notes != null && appointment.notes!.isNotEmpty && appointment.notes! == "termin");
-                    bool isVertretung = (!isTermin && appointment.notes != null && appointment.notes!.isNotEmpty);
-                    ColorScheme colorScheme = Theme.of(context).colorScheme;
+                  child: SfCalendar(
+                    controller: controller,
+                    view: view,
+                    firstDayOfWeek: 1,
+                    showWeekNumber: true,
+                    showTodayButton: true,
+                    headerHeight: 0,
+                    initialDisplayDate: DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day - DateTime.now().weekday + 1),
+                    timeSlotViewSettings: const TimeSlotViewSettings(
+                      timeIntervalHeight: 80,
+                      timeFormat: "HH",
+                    ),
+                    allowViewNavigation: true,
+                    allowedViews: const [
+                      CalendarView.day,
+                      CalendarView.workWeek,
+                      CalendarView.week,
+                    ],
+                    appointmentBuilder: (context, calendarAppointmentDetails) {
+                      Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
+                      bool isTermin = (appointment.notes != null && appointment.notes!.isNotEmpty && appointment.notes! == "termin");
+                      bool isVertretung = (!isTermin && appointment.notes != null && appointment.notes!.isNotEmpty);
+                      ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-                    Map<String, dynamic> vertretungsMap = isVertretung ? jsonDecode(appointment.notes ?? "{}") : {};
-                    return GestureDetector(
-                      onTap: isVertretung
-                          ? () => showDialog(
-                                builder: (context) {
-                                  double width = MediaQuery.of(context).size.width;
-                                  return Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal:  (Platform.isWindows || Platform.isMacOS) ?
-                                      width > 700 ? (width - 700)/2 +32 : 32
-                                          : 8),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: klassenVertretungsBlock([Vertretung.fromMap(vertretungsMap)], theme: Theme.of(context)),
+                      Map<String, dynamic> vertretungsMap = isVertretung ? jsonDecode(appointment.notes ?? "{}") : {};
+                      return GestureDetector(
+                        onTap: isVertretung
+                            ? () => showDialog(
+                                  builder: (context) {
+                                    double width = MediaQuery.of(context).size.width;
+                                    return Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal:  (Platform.isWindows || Platform.isMacOS) ?
+                                        width > 800 ? (width - 800)/2 +32 : 32
+                                            : 8),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: klassenVertretungsBlock([Vertretung.fromMap(vertretungsMap)], theme: Theme.of(context)),
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
-                                context: context,
-                              )
-                          : isTermin
-                              ? () => showDialog(
-                                    builder: (context) {
-                                      DateFormat dateFormat = DateFormat("dd.MM.yy\nHH:mm");
+                                    );
+                                  },
+                                  context: context,
+                                )
+                            : isTermin
+                                ? () => showDialog(
+                                      builder: (context) {
+                                        DateFormat dateFormat = DateFormat("dd.MM.yy\nHH:mm");
 
-                                      return Center(
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: colorScheme.secondaryContainer,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            padding: const EdgeInsets.all(8),
-                                            child: IntrinsicHeight(
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Text(
-                                                        dateFormat.format(appointment.startTime),
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(
-                                                          color: colorScheme.onSecondaryContainer,
-                                                          fontSize: 12,
+                                        return Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16.0),
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: colorScheme.secondaryContainer,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              padding: const EdgeInsets.all(8),
+                                              child: IntrinsicHeight(
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          dateFormat.format(appointment.startTime),
+                                                          textAlign: TextAlign.center,
+                                                          style: TextStyle(
+                                                            color: colorScheme.onSecondaryContainer,
+                                                            fontSize: 12,
+                                                          ),
                                                         ),
-                                                      ),
-                                                      const SizedBox(
-                                                        height: 4,
-                                                      ),
-                                                      Text(
-                                                        dateFormat.format(appointment.endTime),
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(
-                                                          color: colorScheme.onSecondaryContainer,
-                                                          fontSize: 12,
+                                                        const SizedBox(
+                                                          height: 4,
                                                         ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  Padding(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                    child: VerticalDivider(
-                                                      width: 1,
-                                                      color: colorScheme.onSecondaryContainer,
+                                                        Text(
+                                                          dateFormat.format(appointment.endTime),
+                                                          textAlign: TextAlign.center,
+                                                          style: TextStyle(
+                                                            color: colorScheme.onSecondaryContainer,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ),
-                                                  Flexible(
-                                                    child: Text(
-                                                      appointment.subject,
-                                                      style: TextStyle(
+                                                    Padding(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                      child: VerticalDivider(
+                                                        width: 1,
                                                         color: colorScheme.onSecondaryContainer,
-                                                        fontSize: 16,
                                                       ),
                                                     ),
-                                                  ),
-                                                ],
+                                                    Flexible(
+                                                      child: Text(
+                                                        appointment.subject,
+                                                        style: TextStyle(
+                                                          color: colorScheme.onSecondaryContainer,
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      );
-                                    },
-                                    context: context,
-                                  )
-                              : null,
-                      child: Container(
-                        decoration: BoxDecoration(
-                            color: isTermin
-                                ? colorScheme.secondaryContainer
-                                : isVertretung
-                                    ? colorScheme.errorContainer
-                                    : colorScheme.primaryContainer,
-                            borderRadius: const BorderRadius.all(Radius.circular(4))),
-                        width: calendarAppointmentDetails.bounds.width,
-                        height: calendarAppointmentDetails.bounds.height,
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(1.0),
-                                  child: Text(
-                                    appointment.subject,
-                                    overflow: isTermin && appointment.isAllDay ? TextOverflow.ellipsis : null,
-                                    maxLines: isTermin && appointment.isAllDay ? 1 : null,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: isTermin ? colorScheme.onSecondaryContainer : null,
+                                        );
+                                      },
+                                      context: context,
+                                    )
+                                : null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                              color: isTermin
+                                  ? colorScheme.secondaryContainer
+                                  : isVertretung
+                                      ? colorScheme.errorContainer
+                                      : colorScheme.primaryContainer,
+                              borderRadius: const BorderRadius.all(Radius.circular(4))),
+                          width: calendarAppointmentDetails.bounds.width,
+                          height: calendarAppointmentDetails.bounds.height,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(1.0),
+                                    child: Text(
+                                      appointment.subject,
+                                      overflow: isTermin && appointment.isAllDay ? TextOverflow.ellipsis : null,
+                                      maxLines: isTermin && appointment.isAllDay ? 1 : null,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isTermin ? colorScheme.onSecondaryContainer : null,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                    textAlign: TextAlign.center,
                                   ),
                                 ),
                               ),
-                            ),
-                            if (isVertretung && vertretungsMap["eva"] != null)
-                              Align(
-                                alignment: Alignment.bottomRight,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2.0),
-                                  child: Icon(
-                                    Ionicons.information_circle_outline,
-                                    size: 16,
-                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                              if (isVertretung && vertretungsMap["eva"] != null)
+                                Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2.0),
+                                    child: Icon(
+                                      Ionicons.information_circle_outline,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.onErrorContainer,
+                                    ),
                                   ),
-                                ),
-                              )
-                          ],
+                                )
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  //viewNavigationMode: ViewNavigationMode.snap,
-                  onViewChanged: (details) {
-                    int visibleDates = details.visibleDates.length;
-                    int view = visibleDates == 1
-                        ? 0
-                        : visibleDates == 7
-                            ? 2
-                            : 1;
-                    this.view = controller.view ?? CalendarView.workWeek;
-                    prefs.setInt("stundenplanView", view);
-                    if (calendarInitialized)
-                      Future.delayed(const Duration(milliseconds: 500), () {
-                        if (context.mounted) setState(() {});
-                      });
-                    else
-                      calendarInitialized = true;
-                  },
-                  selectionDecoration: const BoxDecoration(
-                    color: Colors.transparent,
-                    border: null,
+                      );
+                    },
+                    //viewNavigationMode: ViewNavigationMode.snap,
+                    onViewChanged: (details) {
+                      int visibleDates = details.visibleDates.length;
+                      int view = visibleDates == 1
+                          ? 0
+                          : visibleDates == 7
+                              ? 2
+                              : 1;
+                      this.view = controller.view ?? CalendarView.workWeek;
+                      prefs.setInt("stundenplanView", view);
+                      if (calendarInitialized)
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (context.mounted) setState(() {});
+                        });
+                      else
+                        calendarInitialized = true;
+                    },
+                    selectionDecoration: const BoxDecoration(
+                      color: Colors.transparent,
+                      border: null,
+                    ),
+                    dataSource: getCalendarDataSource(
+                        isar: widget.isar,
+                        prefs: prefs,
+                        stufe: prefs.getString("stundenplanStufe") ?? "",
+                        isOberstufe: prefs.getBool("stundenplanIsOberstufe") ?? false),
                   ),
-                  dataSource: _getCalendarDataSource(
-                      isar: widget.isar,
-                      prefs: prefs,
-                      stufe: prefs.getString("stundenplanStufe") ?? "",
-                      isOberstufe: prefs.getBool("stundenplanIsOberstufe") ?? false),
                 ),
               ),
             ],
@@ -356,230 +366,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
   }
 }
 
-void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh,
-    [Function(List<Stunde> stunden, String stufe)? customKursSelection]) async {
-  List<String> klassen = List.empty(growable: true);
-  List<String> oberstufen = List.empty(growable: true);
-  List<String> stufen = List.empty(growable: true);
-  bool loading = false;
-  PdfDocument? klassenplan;
-  PdfDocument? oberstufenplan;
-
-  showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-            title: const Text("Klasse/Stufe auswählen"),
-            icon: const Icon(Ionicons.options_outline),
-            content: StatefulBuilder(
-              builder: (context, listSetState) {
-                if (stufen.isEmpty) {
-                  (() async {
-                    try {
-                      (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
-
-                      klassen = await compute(getStufen, klassenplan);
-                      oberstufen = await compute(getStufen, oberstufenplan);
-                      if (context.mounted) {
-                        listSetState(() {
-                          stufen.addAll(klassen);
-                          stufen.addAll(oberstufen);
-                        });
-                      }
-                    } catch (e) {
-                      if (kDebugMode) {
-                        print(e);
-                      }
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                      ));
-                    }
-                  }).call();
-                  return const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CupertinoActivityIndicator(),
-                  );
-                }
-                if (loading || klassenplan == null || oberstufenplan == null) {
-                  return const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CupertinoActivityIndicator(),
-                  );
-                }
-                return SingleChildScrollView(
-                    child: Column(
-                  children: [
-                    for (int i = 0; i < stufen.length; i++)
-                      ListTile(
-                        title: Text(stufen[i]),
-                        onTap: () async {
-                          if (i < klassen.length) {
-                            listSetState(() {
-                              loading = true;
-                            });
-                            setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, isar, prefs, refresh);
-                            if (context.mounted) Navigator.pop(context);
-                          } else {
-                            listSetState(() {
-                              loading = true;
-                            });
-                            List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
-                            if (context.mounted) Navigator.pop(context);
-                            if (customKursSelection != null) {
-                              customKursSelection(stunden, oberstufen[i - klassen.length]);
-                            } else {
-                              showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
-                            }
-                          }
-                        },
-                      ),
-                  ],
-                ));
-              },
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
-          ));
-}
-
-void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
-  await isar.writeTxn(() async {
-    await isar.stundes.clear();
-    await isar.stundes.putAll(stunden);
-  });
-  await prefs.setString("stundenplanStufe", stufe);
-  await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
-  refresh();
-  try {
-    await Future.delayed(const Duration(seconds: 10));
-    await updateStundenplan(isar);
-  } catch (e) {
-    if (kDebugMode) print(e);
-  }
-  refresh();
-}
-
-Future<bool> showStundenplanSelection(
-    List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
-  DateTime initialDisplayDate = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute));
-  if (stunden.isNotEmpty && initialDisplayDate.isBefore(stunden.first.gueltigAb)) {
-    DateTime firstTime = stunden.first.gueltigAb;
-    initialDisplayDate =
-        firstTime.add(const Duration(days: 7)).subtract(Duration(days: firstTime.weekday - 1, hours: firstTime.hour, minutes: firstTime.minute));
-  }
-  CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
-  Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
-  var result = await Navigator.push(getContext(), MaterialPageRoute(builder: (context) {
-    CalendarController calendarController = CalendarController();
-    bool flyby = false;
-    bool visitedFriday = false;
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text("Wähle deine Kurse"),
-          ),
-          body: SfCalendar(
-            initialDisplayDate: initialDisplayDate,
-            view: CalendarView.day,
-            controller: calendarController,
-            onViewChanged: (viewChangedDetails) {
-              if (viewChangedDetails.visibleDates.first.weekday == 5) {
-                setState(() {
-                  visitedFriday = true;
-                });
-              }
-              if (flyby) return;
-              if (viewChangedDetails.visibleDates.first.weekday == 6) {
-                flyby = true;
-                calendarController.forward!();
-                calendarController.forward!();
-                flyby = false;
-              }
-              if (viewChangedDetails.visibleDates.first.weekday == 7) {
-                flyby = true;
-                calendarController.backward!();
-                calendarController.backward!();
-                flyby = false;
-              }
-            },
-            dataSource: dataTableSource,
-            allowViewNavigation: false,
-            showCurrentTimeIndicator: false,
-            showTodayButton: false,
-            showWeekNumber: true,
-            appointmentBuilder: (context, calendarAppointmentDetails) {
-              Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
-              bool? active = activeStunden[stunden.firstWhere((element) => element.name == appointment.subject)];
-              if (active == null) throw StateError("couldnt find active Stunde");
-              return GestureDetector(
-                onTap: () => setState(() {
-                  List<Stunde> stundenToActivate = stunden
-                      .where((element) => element.name.split(" ").getRange(0, 2).join(" ") == appointment.subject.split(" ").getRange(0, 2).join(" "))
-                      .toList();
-                  for (Stunde stunde in stundenToActivate) {
-                    activeStunden[stunde] = !active;
-                  }
-                }),
-                child: Container(
-                  decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                      ),
-                      color: active ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface,
-                      borderRadius: const BorderRadius.all(Radius.circular(4))),
-                  width: calendarAppointmentDetails.bounds.width,
-                  height: calendarAppointmentDetails.bounds.height,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(1.0),
-                      child: Text(
-                        appointment.subject,
-                        style: const TextStyle(),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-            timeSlotViewSettings: const TimeSlotViewSettings(
-              timeFormat: "HH",
-              startHour: 0,
-              endHour: 12,
-              timeIntervalHeight: 80,
-            ),
-            viewHeaderStyle: const ViewHeaderStyle(
-              dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
-            ),
-            minDate: initialDisplayDate,
-            maxDate: initialDisplayDate.add(const Duration(days: 12)).subtract(const Duration(minutes: 1)),
-            selectionDecoration: const BoxDecoration(
-              color: Colors.transparent,
-              border: null,
-            ),
-          ),
-          floatingActionButton: AnimatedScale(
-            duration: const Duration(milliseconds: 300),
-            scale: visitedFriday ? 1 : 0,
-            child: FloatingActionButton.extended(
-              heroTag: null,
-              onPressed: () {
-                setStundenplan((activeStunden..removeWhere((key, value) => !value)).keys.toList(), stufe, true, isar, prefs, refresh);
-                Navigator.of(context).pop(true);
-              },
-              icon: const Icon(Ionicons.checkmark),
-              label: const Text("Kursauswahl bestätigen"),
-            ),
-          ),
-        );
-      },
-    );
-  }));
-  if (result is bool) return result;
-  return false;
-}
-
-_AppointmentDataSource _getCalendarDataSource({required Isar isar, required SharedPreferences prefs, required String stufe, required bool isOberstufe}) {
+_AppointmentDataSource getCalendarDataSource({required Isar isar, required SharedPreferences prefs, required String stufe, required bool isOberstufe}) {
   List<Stunde> stunden = isar.stundes.where().findAllSync();
   Set<String> kurse = stunden.map((e) {
     List<String> split = e.name.split(" ");
@@ -674,7 +461,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
   if (prefs.getBool("showTermine") ?? true) toShowTermine.addAll(piusTermine);
   if (prefs.getBool("showFeiertage") ?? true) toShowTermine.addAll(feiertagTermine);
 
-  return _getCalendarDataSourceFromStunden(
+  return getCalendarDataSourceFromStunden(
       stunden: stunden..addAll(vertretungsStunden),
       vertretungen: vertretungen,
       isOberstufe: isOberstufe,
@@ -682,7 +469,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
       termine: toShowTermine);
 }
 
-_AppointmentDataSource _getCalendarDataSourceFromStunden(
+_AppointmentDataSource getCalendarDataSourceFromStunden(
     {required List<Stunde> stunden,
     List<(DateTime, DateTime)> schulfreieZeiten = const <(DateTime, DateTime)>[],
     List<Appointment> termine = const <Appointment>[],
