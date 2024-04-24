@@ -307,17 +307,16 @@ class _OuterPageState extends State<OuterPage> {
   }
 
   void loadCalendarContent({bool forceUpdateStundenPlan = false}) async {
-    bool shouldUpdateTermine = forceUpdateStundenPlan ||
+    bool shouldUpdateTermine =
         DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastTermineUpdate") ?? 0)
             .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("termineUpdateDuration") ?? 8)));
-    bool shouldUpdateStundenplan = forceUpdateStundenPlan ||
-        DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
-            .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
-    if (shouldUpdateTermine || shouldUpdateStundenplan) {
+    bool shouldUpdateStundenplan = DateTime.fromMillisecondsSinceEpoch(widget.prefs.getInt("lastStundenplanUpdate") ?? 0)
+        .isBefore(DateTime.now().subtract(durations.values.elementAt(widget.prefs.getInt("stundenplanUpdateDuration") ?? 8)));
+    if (shouldUpdateTermine || shouldUpdateStundenplan || forceUpdateStundenPlan) {
       calendarLoadingNotifier.value = true;
       bool failed = false;
-      if (shouldUpdateTermine &&
-          (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if (forceUpdateStundenPlan || (shouldUpdateTermine &&
+          (!(widget.prefs.getBool("termineUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi))) {
         try {
           await updateTermine();
           widget.prefs.setInt("lastTermineUpdate", DateTime.now().millisecondsSinceEpoch);
@@ -328,8 +327,8 @@ class _OuterPageState extends State<OuterPage> {
           failed = true;
         }
       }
-      if (shouldUpdateStundenplan &&
-          (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi)) {
+      if (forceUpdateStundenPlan || (shouldUpdateStundenplan &&
+          (!(widget.prefs.getBool("stundenplanUpdateWifi") ?? true) || await Connectivity().checkConnectivity() == ConnectivityResult.wifi))) {
         try {
           await updateStundenplan(widget.isar);
           widget.prefs.setInt("lastStundenplanUpdate", DateTime.now().millisecondsSinceEpoch);

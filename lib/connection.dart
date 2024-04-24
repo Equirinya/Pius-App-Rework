@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:PiusApp/pages/settings.dart';
+import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -104,17 +105,23 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
   if (stundenplaene.length < 2) throw Exception("less than 2 stundenplaene found");
 
   try {
-    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> klassenplaene = (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
-    if(klassenplaene.isEmpty) throw Exception("Keinen Klassenplan gefunden");
+    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> klassenplaene =
+        (stundenplaene.where((element) => !element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
+    if (klassenplaene.isEmpty) throw Exception("Keinen Klassenplan gefunden");
     String klassenplan;
-    if(klassenplaene.length == 1) klassenplan = klassenplaene.first.$4;
-    else klassenplan = klassenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+    if (klassenplaene.length == 1)
+      klassenplan = klassenplaene.first.$4;
+    else
+      klassenplan = klassenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
 
-    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> oberstufenplaene = (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
-    if(oberstufenplaene.isEmpty) throw Exception("Keinen Oberstufenplan gefunden");
+    List<(DateTime starting, DateTime updated, bool oberstufe, String url)> oberstufenplaene =
+        (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
+    if (oberstufenplaene.isEmpty) throw Exception("Keinen Oberstufenplan gefunden");
     String oberstufenplan;
-    if(oberstufenplaene.length == 1) oberstufenplan = oberstufenplaene.first.$4;
-    else oberstufenplan = oberstufenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+    if (oberstufenplaene.length == 1)
+      oberstufenplan = oberstufenplaene.first.$4;
+    else
+      oberstufenplan = oberstufenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
 
     return (PdfDocument(inputBytes: (await getSecuredPage(klassenplan)).bodyBytes), PdfDocument(inputBytes: (await getSecuredPage(oberstufenplan)).bodyBytes));
   } catch (e, s) {
@@ -124,12 +131,26 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
 }
 
 Future<void> updateStundenplan(Isar isar) async {
-  DOM.Document document = parse(await getStundenplanWebsite());
-
   SharedPreferences prefs = await SharedPreferences.getInstance();
   String? stufe = prefs.getString("stundenplanStufe");
   bool? isOberstufe = prefs.getBool("stundenplanIsOberstufe");
+
   if (stufe == null || isOberstufe == null || stufe.isEmpty) throw Exception("No stufe found");
+  if (isOberstufe && isar.stundes.where().isEmptySync()) throw Exception("No selected courses found to update from");
+
+  List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
+  if (kurse.isEmpty) {
+    var (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
+    setStundenplan(
+      await compute(getStundenPlan, (stufe, klassenplan, isOberstufe)),
+      stufe,
+      isOberstufe,
+      isar,
+      prefs,
+      () {},
+    );
+  }
+  DOM.Document document = parse(await getStundenplanWebsite());
 
   List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = await getStundenplanLinks(document);
   stundenplaene = stundenplaene.where((element) => element.$3 == isOberstufe).toList();
@@ -138,7 +159,6 @@ Future<void> updateStundenplan(Isar isar) async {
 
   int lastUpdate = prefs.getInt("stundenplanLastUpdate") ?? 0;
 
-  List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
   List<DateTime> existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
   DateTime newestExisting = existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value);
   List<DateTime> neueGueltigAb = stundenplaene.map((e) => e.$1).toList();
@@ -211,7 +231,7 @@ Future<List<(DateTime starting, DateTime updated, bool oberstufe, String url)>> 
     while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
     DateTime updated = europeanDateFormatter.parse(name.substring(parseStart, parseStart + 10));
 
-    bool oberstufe = name.toLowerCase().contains("oberstufe");
+    bool oberstufe = name.toLowerCase().contains("oberstufe") || name.toLowerCase().contains("q1");
     if (!oberstufe && !name.toLowerCase().contains("klasse"))
       throw Exception("Stundenplan welcher weder als Klasse noch Oberstufe identifizierbar ist gefunden");
     stundenplaene.add((starting, updated, oberstufe, Uri.parse(stundenplanUrlMaybeOverriden).resolve(element.attributes["href"]!).toString()));
@@ -220,7 +240,7 @@ Future<List<(DateTime starting, DateTime updated, bool oberstufe, String url)>> 
 }
 
 Future<List<String>> getStufen(PdfDocument? plan) async {
-  if(plan == null) return List.empty(growable: true);
+  if (plan == null) return List.empty(growable: true);
   List<String> stufen = List.empty(growable: true);
 
   for (int i = 0; i < plan.pages.count; i++) {
@@ -237,7 +257,7 @@ Future<List<String>> getStufen(PdfDocument? plan) async {
 }
 
 Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isOberstufe) value) async {
-  if(value.$2 == null) return List.empty(growable: true);
+  if (value.$2 == null) return List.empty(growable: true);
   String stufe = value.$1;
   PdfDocument plan = value.$2!;
   bool isOberstufe = value.$3;
@@ -249,6 +269,10 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
 
   List<Stunde> stunden = List.empty(growable: true);
   int stufenIndex = stufen.indexOf(stufe);
+
+  if (stufenIndex == -1) {
+    throw Exception("Couldn't find stufe in stundenplan");
+  }
 
   List<TextLine> lines = PdfTextExtractor(plan)
       .extractTextLines(startPageIndex: isOberstufe ? stufenIndex * 2 : stufenIndex, endPageIndex: isOberstufe ? stufenIndex * 2 : stufenIndex);
@@ -433,7 +457,7 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
         List<int> stundenList;
         if (stunden.contains(" ") || stunden.contains("-")) {
           List<String> stundenSplit = stunden.split("-");
-          if(stundenSplit.length != 2) throw Exception("Invalid stunden format");
+          if (stundenSplit.length != 2) throw Exception("Invalid stunden format");
           stundenList = [for (int i = int.parse(stundenSplit[0].trim()); i <= int.parse(stundenSplit[1].trim()); i++) i - 1];
         } else {
           stundenList = [int.parse(stunden) - 1];
@@ -537,9 +561,9 @@ Future<http.Response> getSecuredPage(String url) async {
 
   if (username == null || password == null) throw Exception("No username or password found");
 
-  if(username == "test" && password == "test") {
-    if(url == vertretungsplanUrl) url = "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/vertretungsplan.html";
-    if(url == stundenplanUrl) url =  "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/stundenplaene.html";
+  if (username == "test" && password == "test") {
+    if (url == vertretungsplanUrl) url = "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/vertretungsplan.html";
+    if (url == stundenplanUrl) url = "https://raw.githubusercontent.com/Equirinya/Pius-App-Rework/master/test_websites/stundenplaene.html";
     return await http.get(Uri.parse(url));
   }
 
@@ -557,7 +581,6 @@ Future<http.Response> getSecuredPage(String url) async {
 }
 
 FlutterSecureStorage getSecurePrefs() {
-
   AndroidOptions getAndroidOptions() => const AndroidOptions(
         encryptedSharedPreferences: true,
       );
@@ -568,7 +591,9 @@ FlutterSecureStorage getSecurePrefs() {
 
 class AuthorizationException implements Exception {
   final String msg;
+
   const AuthorizationException(this.msg);
+
   @override
   String toString() => msg;
 }
