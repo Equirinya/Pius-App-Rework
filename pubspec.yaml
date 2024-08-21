@@ -39,11 +39,11 @@ dependencies:
   shared_preferences: ^2.0.15
 
   path_provider: ^2.0.9
-  connectivity_plus: ^4.0.0
-  package_info_plus: ^4.1.0
-  intl: ^0.18.1
+  connectivity_plus: ^6.0.5
+  package_info_plus: ^8.0.2
+  intl: ^0.19.0
   url_launcher: ^6.2.1
-  share_plus: ^7.2.2
+  share_plus: ^10.0.0
 
   flutter_native_splash: ^2.2.17
   flutter_launcher_icons: ^0.13.0
@@ -52,19 +52,19 @@ dependencies:
 
   dynamic_color: ^1.6.4
   flex_color_picker: ^3.3.0
-  flex_seed_scheme: ^1.4.0
+  flex_seed_scheme: ^3.1.2
   smooth_page_indicator: ^1.1.0
   cached_network_image: ^3.3.1
-  flutter_widget_from_html: ^0.14.11
+  flutter_widget_from_html: ^0.15.1
 
-  syncfusion_flutter_pdf: 23.1.38
-  syncfusion_flutter_calendar: 23.1.38
-  syncfusion_localizations: 23.1.38
-  flutter_localization: ^0.1.13
+  syncfusion_flutter_pdf: ^26.2.10
+  syncfusion_flutter_calendar: ^26.2.10
+  syncfusion_localizations: ^26.2.10
+  flutter_localization: ^0.2.1
   icalendar_parser: ^2.0.0
 
   background_fetch: ^1.2.1
-  flutter_local_notifications: ^16.1.0
+  flutter_local_notifications: ^17.2.2
   app_settings: ^5.1.1
 
 dev_dependencies:
@@ -78,7 +78,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^2.0.0
+  flutter_lints: ^4.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
