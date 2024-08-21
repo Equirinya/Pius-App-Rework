@@ -332,7 +332,7 @@ Widget klassenVertretungsBlock(List<Vertretung> vertretungsBlock,
             color: evaColor,
             child: Padding(
               padding: const EdgeInsets.all(4.0),
-              child: Text("⤷ Eva: ${vertretung.eva ?? ""}", style: TextStyle(fontSize: fontSize,
+              child: Text("⤷ Auftrag: ${vertretung.eva ?? ""}", style: TextStyle(fontSize: fontSize,
                 color: vertretungsColors != null
                     ? evaColor.computeLuminance() > 0.5
                         ? darkTextColor

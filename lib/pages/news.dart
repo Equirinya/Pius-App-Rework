@@ -46,7 +46,7 @@ class _NewsPageState extends State<NewsPage> {
   void asyncInit() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('newsUpdateStart') ?? true) {
-      ConnectivityResult connectivityResult = await Connectivity().checkConnectivity();
+      ConnectivityResult connectivityResult = (await Connectivity().checkConnectivity()).first;
       if ((!(prefs.getBool("vertretungUpdateWifi") ?? false) || connectivityResult == ConnectivityResult.wifi)) {
         updateNews();
       }

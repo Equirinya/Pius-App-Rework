@@ -476,13 +476,13 @@ _AppointmentDataSource getCalendarDataSourceFromStunden(
     List<Vertretung> vertretungen = const <Vertretung>[],
     bool isOberstufe = false,
     bool realTime = true}) {
+
   List<Appointment> appointments = <Appointment>[];
 
   List<(int stunde, int minute)> uhrzeiten = realTime ? stundenZeiten : [for (int i = 0; i < 11; i++) (i, 30)];
 
   DateTime alternativeEndDate = DateTime.now().add(Duration(days: DateTime.now().month <= 7 ? 0 : 365)).copyWith(month: 7, day: 31);
-  Appointment? sommerferien = termine.where((element) => element.subject.contains("Sommerferien")).firstOrNull;
-  if (sommerferien != null) alternativeEndDate = sommerferien.startTime;
+  List<Appointment> sommerferien = termine.where((element) => element.subject.contains("Sommerferien")).toList();
 
   for (Stunde stunde in stunden) {
     final (int uStunde, int uMinute) = uhrzeiten[stunde.stunden.first];
@@ -493,7 +493,8 @@ _AppointmentDataSource getCalendarDataSourceFromStunden(
       firstTime = firstTime.add(const Duration(days: 7));
     }
     final DateTime endTime = firstTime.copyWith(hour: eStunde, minute: eMinute).add(Duration(minutes: realTime ? 45 : 60));
-    final DateTime endDate = stunde.gueltigBis ?? alternativeEndDate;
+    DateTime? nextSommerFerienStart = (sommerferien.where((element) => element.startTime.isAfter(stunde.gueltigAb)).toList()..sort((a, b) => a.startTime.compareTo(b.startTime))).firstOrNull?.startTime;
+    final DateTime endDate = stunde.gueltigBis ?? (nextSommerFerienStart ?? alternativeEndDate);
 
     bool isVertretung = stunde.vertretung.value != null;
     List<DateTime> vertreteneTage = List.empty(growable: true);
