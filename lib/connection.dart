@@ -139,17 +139,18 @@ Future<void> updateStundenplan(Isar isar) async {
   if (isOberstufe && isar.stundes.where().isEmptySync()) throw Exception("No selected courses found to update from");
 
   List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
-  if (kurse.isEmpty) {
-    var (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
-    setStundenplan(
-      await compute(getStundenPlan, (stufe, klassenplan, isOberstufe)),
-      stufe,
-      isOberstufe,
-      isar,
-      prefs,
-      () {},
-    );
-  }
+  //TODO find out if this code can actually be omitted
+  // if (kurse.isEmpty) {
+  //   var (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
+  //   setStundenplan(
+  //     await compute(getStundenPlan, (stufe, klassenplan, isOberstufe)),
+  //     stufe,
+  //     isOberstufe,
+  //     isar,
+  //     prefs,
+  //     () {},
+  //   );
+  // }
   DOM.Document document = parse(await getStundenplanWebsite());
 
   List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = await getStundenplanLinks(document);

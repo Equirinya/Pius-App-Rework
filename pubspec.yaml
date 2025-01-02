@@ -49,6 +49,7 @@ dependencies:
   flutter_launcher_icons: ^0.13.0
   ionicons: ^0.2.2
   cupertino_icons: ^1.0.2
+  fluent_ui: ^4.9.1
 
   dynamic_color: ^1.6.4
   flex_color_picker: ^3.3.0
@@ -56,6 +57,8 @@ dependencies:
   smooth_page_indicator: ^1.1.0
   cached_network_image: ^3.3.1
   flutter_widget_from_html: ^0.15.1
+  pretty_qr_code: ^3.3.0
+  flutter_markdown: ^0.7.4+3
 
   syncfusion_flutter_pdf: ^26.2.10
   syncfusion_flutter_calendar: ^26.2.10

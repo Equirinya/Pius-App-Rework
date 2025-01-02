@@ -431,7 +431,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 maxLines: null,
                                 decoration: const InputDecoration(
                                   labelText: "Kurse",
-                                  hintText: "Füge die Kurse hier ein, getrennt durch Kommas oder Zeilenumbrüche.",
+                                  hintText: "Füge die Kurse hier ein, getrennt durch Kommata oder Zeilenumbrüche.",
                                 ),
                               ),
                               actions: [

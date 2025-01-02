@@ -32,6 +32,8 @@ import 'dart:io' show Platform;
 
 //TODO google calendar
 //TODO qr code
+//TODO on start up notice, through github
+//TODO also new version dialog - https://pub.dev/packages/flutter_markdown
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

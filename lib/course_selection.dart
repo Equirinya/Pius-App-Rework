@@ -328,7 +328,7 @@ class _CourseSelectionState extends State<CourseSelection> with SingleTickerProv
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Klasse/Stufe auswählen"),
+        title: const Text("Klasse/Kurse auswählen"),
         bottom: TabBar(
           controller: tabController,
           tabs: [
@@ -342,7 +342,7 @@ class _CourseSelectionState extends State<CourseSelection> with SingleTickerProv
         controller: tabController,
         children: [
           downloaded ? Placeholder() : const Center(child: CupertinoActivityIndicator()),
-          //TODO QR
+          downloaded ? Center(child: Text("QR-Code Scanning not suppoerted yet"),) : const Center(child: CupertinoActivityIndicator()),
           downloaded ? Placeholder() : const Center(child: CupertinoActivityIndicator()),
         ],
       ),
