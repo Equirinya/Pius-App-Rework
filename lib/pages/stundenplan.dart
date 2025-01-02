@@ -81,6 +81,10 @@ class _StundenplanPageState extends State<StundenplanPage> {
       backgroundColor: MaterialStateProperty.all(Theme.of(context).colorScheme.surfaceVariant),
     );
 
+    //if its saturday or sunday and school-week-view, show the next monday
+    int dayShift = view == CalendarView.workWeek && DateTime.now().weekday >= 6 ? 8-DateTime.now().weekday : 0;
+    DateTime initialDisplayDate = DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day + dayShift);
+
     return SafeArea(
       child: Scaffold(
           appBar: AppBar(
@@ -154,7 +158,7 @@ class _StundenplanPageState extends State<StundenplanPage> {
                   showWeekNumber: true,
                   showTodayButton: true,
                   headerHeight: 0,
-                  initialDisplayDate: DateTime.now().copyWith(hour: 7, minute: 55, day: DateTime.now().day - DateTime.now().weekday + 1),
+                  initialDisplayDate: initialDisplayDate,
                   timeSlotViewSettings: const TimeSlotViewSettings(
                     timeIntervalHeight: 80,
                     timeFormat: "HH",

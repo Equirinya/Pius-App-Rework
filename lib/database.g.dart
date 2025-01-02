@@ -79,7 +79,7 @@ const VertretungSchema = CollectionSchema(
   getId: _vertretungGetId,
   getLinks: _vertretungGetLinks,
   attach: _vertretungAttach,
-  version: '3.1.0+1',
+  version: '3.1.8',
 );
 
 int _vertretungEstimateSize(
@@ -2037,7 +2037,7 @@ const StundeSchema = CollectionSchema(
   getId: _stundeGetId,
   getLinks: _stundeGetLinks,
   attach: _stundeAttach,
-  version: '3.1.0+1',
+  version: '3.1.8',
 );
 
 int _stundeEstimateSize(
@@ -2983,7 +2983,7 @@ const NewsSchema = CollectionSchema(
   getId: _newsGetId,
   getLinks: _newsGetLinks,
   attach: _newsAttach,
-  version: '3.1.0+1',
+  version: '3.1.8',
 );
 
 int _newsEstimateSize(
@@ -4106,7 +4106,7 @@ const ColorPaletteSchema = CollectionSchema(
   getId: _colorPaletteGetId,
   getLinks: _colorPaletteGetLinks,
   attach: _colorPaletteAttach,
-  version: '3.1.0+1',
+  version: '3.1.8',
 );
 
 int _colorPaletteEstimateSize(

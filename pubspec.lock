@@ -221,10 +221,10 @@ packages:
     dependency: transitive
     description:
       name: collection
-      sha256: ee67cb0715911d28db6bf4af1026078bd6f0128b07a5f66fb2ed94ec6783c09a
+      sha256: a1ace0a119f20aabc852d165077c036cd864315bd99b7eaa10a60100341941bf
       url: "https://pub.dev"
     source: hosted
-    version: "1.18.0"
+    version: "1.19.0"
   connectivity_plus:
     dependency: "direct main"
     description:
@@ -505,18 +505,18 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_widget_from_html
-      sha256: e79144d8a37b7d1075fc1fdebc32708bd142ad9fdf1c7d9444f5e964cc03158b
+      sha256: f3967a5b42896662efdd420b5adaf8a7d3692b0f44462a07c80e3b4c173b1a02
       url: "https://pub.dev"
     source: hosted
-    version: "0.15.1"
+    version: "0.15.3"
   flutter_widget_from_html_core:
     dependency: transitive
     description:
       name: flutter_widget_from_html_core
-      sha256: df7c7c9e5ea144f7ab0adfbad733b4d4f7d408ab733c94e6e9fdcb327af92aa1
+      sha256: b1048fd119a14762e2361bd057da608148a895477846d6149109b2151d2f7abf
       url: "https://pub.dev"
     source: hosted
-    version: "0.15.1"
+    version: "0.15.2"
   frontend_server_client:
     dependency: transitive
     description:
@@ -545,18 +545,18 @@ packages:
     dependency: transitive
     description:
       name: fwfh_just_audio
-      sha256: "4ff7927619ff4855567a61e126269e1fef985a9fe7e78682592da17bf658aabb"
+      sha256: "38dc2c55803bd3cef33042c473e0c40b891ad4548078424641a32032f6a1245f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.15.1"
+    version: "0.15.2"
   fwfh_svg:
     dependency: transitive
     description:
       name: fwfh_svg
-      sha256: c6bb6b513f7ce2766aba76d7276caf9a96b6fee729ac3a492c366a42f82ef02e
+      sha256: "550b1014d12b5528d8bdb6e3b44b58721f3fb1f65d7a852d1623a817008bdfc4"
       url: "https://pub.dev"
     source: hosted
-    version: "0.8.2"
+    version: "0.8.3"
   fwfh_url_launcher:
     dependency: transitive
     description:
@@ -569,10 +569,10 @@ packages:
     dependency: transitive
     description:
       name: fwfh_webview
-      sha256: "2cd2b1e463ddaf26b7d4f74e1a855126c4a836fdaff9551636693e07a07422b6"
+      sha256: c0a8b664b642f40f4c252a0ab4e72c22dcd97c7fb3a7e50a6b4bdb6f63afca19
       url: "https://pub.dev"
     source: hosted
-    version: "0.15.1"
+    version: "0.15.3"
   glob:
     dependency: transitive
     description:
@@ -665,26 +665,26 @@ packages:
     dependency: "direct main"
     description:
       name: isar
-      sha256: "99165dadb2cf2329d3140198363a7e7bff9bbd441871898a87e26914d25cf1ea"
-      url: "https://pub.dev"
+      sha256: e17a9555bc7f22ff26568b8c64d019b4ffa2dc6bd4cb1c8d9b269aefd32e53ad
+      url: "https://pub.isar-community.dev"
     source: hosted
-    version: "3.1.0+1"
+    version: "3.1.8"
   isar_flutter_libs:
     dependency: "direct main"
     description:
       name: isar_flutter_libs
-      sha256: bc6768cc4b9c61aabff77152e7f33b4b17d2fc93134f7af1c3dd51500fe8d5e8
-      url: "https://pub.dev"
+      sha256: "78710781e658ce4bff59b3f38c5b2735e899e627f4e926e1221934e77b95231a"
+      url: "https://pub.isar-community.dev"
     source: hosted
-    version: "3.1.0+1"
+    version: "3.1.8"
   isar_generator:
     dependency: "direct dev"
     description:
       name: isar_generator
-      sha256: "76c121e1295a30423604f2f819bc255bc79f852f3bc8743a24017df6068ad133"
-      url: "https://pub.dev"
+      sha256: "484e73d3b7e81dbd816852fe0b9497333118a9aeb646fd2d349a62cc8980ffe1"
+      url: "https://pub.isar-community.dev"
     source: hosted
-    version: "3.1.0+1"
+    version: "3.1.8"
   js:
     dependency: transitive
     description:
@@ -729,18 +729,18 @@ packages:
     dependency: transitive
     description:
       name: leak_tracker
-      sha256: "7f0df31977cb2c0b88585095d168e689669a2cc9b97c309665e3386f3e9d341a"
+      sha256: "7bb2830ebd849694d1ec25bf1f44582d6ac531a57a365a803a6034ff751d2d06"
       url: "https://pub.dev"
     source: hosted
-    version: "10.0.4"
+    version: "10.0.7"
   leak_tracker_flutter_testing:
     dependency: transitive
     description:
       name: leak_tracker_flutter_testing
-      sha256: "06e98f569d004c1315b991ded39924b21af84cf14cc94791b8aea337d25b57f8"
+      sha256: "9491a714cca3667b60b5c420da8217e6de0d1ba7a5ec322fab01758f6998f379"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.3"
+    version: "3.0.8"
   leak_tracker_testing:
     dependency: transitive
     description:
@@ -777,18 +777,18 @@ packages:
     dependency: transitive
     description:
       name: material_color_utilities
-      sha256: "0e0a020085b65b6083975e499759762399b4475f766c21668c4ecca34ea74e5a"
+      sha256: f7142bb1154231d7ea5f96bc7bde4bda2a0945d2806bb11670e30b850d56bdec
       url: "https://pub.dev"
     source: hosted
-    version: "0.8.0"
+    version: "0.11.1"
   meta:
     dependency: transitive
     description:
       name: meta
-      sha256: "7687075e408b093f36e6bbf6c91878cc0d4cd10f409506f7bc996f68220b9136"
+      sha256: bdb68674043280c3428e9ec998512fb681678676b3c54e773629ffe74419f8c7
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.0"
+    version: "1.15.0"
   mime:
     dependency: transitive
     description:
@@ -1065,7 +1065,7 @@ packages:
     dependency: transitive
     description: flutter
     source: sdk
-    version: "0.0.99"
+    version: "0.0.0"
   smooth_page_indicator:
     dependency: "direct main"
     description:
@@ -1118,10 +1118,10 @@ packages:
     dependency: transitive
     description:
       name: stack_trace
-      sha256: "73713990125a6d93122541237550ee3352a2d84baad52d375a4cad2eb9b7ce0b"
+      sha256: "9f47fd3630d76be3ab26f0ee06d213679aa425996925ff3feffdec504931c377"
       url: "https://pub.dev"
     source: hosted
-    version: "1.11.1"
+    version: "1.12.0"
   stream_channel:
     dependency: transitive
     description:
@@ -1142,10 +1142,10 @@ packages:
     dependency: transitive
     description:
       name: string_scanner
-      sha256: "556692adab6cfa87322a115640c11f13cb77b3f076ddcc5d6ae3c20242bedcde"
+      sha256: "688af5ed3402a4bde5b3a6c15fd768dbf2621a614950b17f04626c431ab3c4c3"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.0"
+    version: "1.3.0"
   syncfusion_flutter_calendar:
     dependency: "direct main"
     description:
@@ -1206,10 +1206,10 @@ packages:
     dependency: transitive
     description:
       name: test_api
-      sha256: "9955ae474176f7ac8ee4e989dadfb411a58c30415bcfb648fa04b2b8a03afa7f"
+      sha256: "664d3a9a64782fcdeb83ce9c6b39e78fd2971d4e37827b9b06c3aa1edc5e760c"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.7.3"
   time:
     dependency: transitive
     description:
@@ -1398,10 +1398,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "3923c89304b715fb1eb6423f017651664a03bf5f4b29983627c4da791f74a4ec"
+      sha256: f6be3ed8bd01289b34d679c2b62226f63c0e69f9fd2e50a6b3c1c729a961041b
       url: "https://pub.dev"
     source: hosted
-    version: "14.2.1"
+    version: "14.3.0"
   wakelock_plus:
     dependency: transitive
     description:
