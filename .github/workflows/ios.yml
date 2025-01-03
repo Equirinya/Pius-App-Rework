@@ -14,11 +14,10 @@ jobs:
 
       # Step 2: Set up Flutter SDK
       - name: Set up Flutter SDK
-        uses: subosito/flutter-action@v2
+        uses: flutter-actions/setup-flutter@v3
         with:
           channel: stable
-          flutter-version-file: pubspec.yaml
-          cache: true
+          version: 3.27.1  # Keep this up to date with flutter --version
 
       # Step 3: Install Dependencies
       - name: Install Dependencies
@@ -74,7 +73,7 @@ jobs:
         env:
           EXPORT_METHOD: "app-store"
           EXPORT_DESTINATION: "export"
-          BUNDLE_ID: "de.equirinya.piusapp"
+          BUNDLE_ID: "de.equirinya.piusapp" #change this when adapting to another app
           PROVISIONING_PROFILE: "profile.mobileprovision"
           TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
