@@ -298,6 +298,7 @@ class _OuterPageState extends State<OuterPage> {
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -323,36 +324,56 @@ class _OuterPageState extends State<OuterPage> {
               }),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-            widget.prefs.setInt("selectedPage", index);
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.calendar),
-            icon: Icon(Ionicons.calendar_outline),
-            label: "Stundenplan",
+      bottomNavigationBar: Theme(
+        data: theme.copyWith(
+          navigationBarTheme: theme.navigationBarTheme.copyWith(
+            labelTextStyle: WidgetStateTextStyle.resolveWith(
+                  (Set<WidgetState> states) {
+                    final TextStyle style = theme.textTheme.labelMedium!;
+                    return style.apply(
+                        color: states.contains(WidgetState.disabled)
+                            ? theme.colorScheme.onSurfaceVariant.withOpacity(0.38)
+                            : states.contains(WidgetState.selected)
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                      fontSizeFactor: 0.95
+                    );
+              },
+            ),
           ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.reorder_four),
-            icon: Icon(Ionicons.reorder_four),
-            label: "Vertretungsplan",
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.newspaper),
-            icon: Icon(Ionicons.newspaper_outline),
-            label: "News",
-          ),
-          NavigationDestination(
-            selectedIcon: Icon(Ionicons.settings),
-            icon: Icon(Ionicons.settings_outline),
-            label: "Einstellungen",
-          ),
-        ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) {
+            setState(() {
+              _selectedIndex = index;
+              widget.prefs.setInt("selectedPage", index);
+            });
+          },
+          destinations: const [
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.calendar),
+              icon: Icon(Ionicons.calendar_outline),
+              label: "Stundenplan",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.reorder_four),
+              icon: Icon(Ionicons.reorder_four),
+              label: "Vertretungsplan",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.newspaper),
+              icon: Icon(Ionicons.newspaper_outline),
+              label: "News",
+            ),
+            NavigationDestination(
+              selectedIcon: Icon(Ionicons.settings),
+              icon: Icon(Ionicons.settings_outline),
+              label: "Einstellungen",
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,10 @@
+#inspired by:
+#https://canopas.com/automate-flutter-ios-app-deployment-with-github-actions-and-codemagic-cli-4d063ea6ef08
+#https://blog.okaryo.studio/en/20240911-flutter-ios-firebase-app-distribution-github-actions-not-auto-signing/
+
+#to create certificate: https://mzansibytes.com/2021/08/28/create-apple-developer-certificates-on-windows/
+#TODO push to github release, get rid of codemagic
+
 name: iOS Build and Deploy to App Store Connect
 
 on:
