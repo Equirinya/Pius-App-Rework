@@ -285,7 +285,7 @@ class _NewsPageState extends State<NewsPage> {
                             return CupertinoPageScaffold(
                               navigationBar: const CupertinoNavigationBar(
                                 previousPageTitle: "News",
-
+                                brightness: Brightness.dark,
                               ),
                                 child: SafeArea(child: buildNewsDetailPage(news, index, context)),
                             );

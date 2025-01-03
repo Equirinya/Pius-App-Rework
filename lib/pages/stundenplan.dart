@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:PiusApp/pages/settings.dart';
+import 'package:PiusApp/utils.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -670,6 +671,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
 
       return null;
     }).nonNulls);
+
   }
 
   if (prefs.getBool("feiertageFrei") ?? true) schulfreieZeiten.addAll(feiertagTermine.map((e) => (e.startTime, e.endTime)));
@@ -742,12 +744,16 @@ _AppointmentDataSource _getCalendarDataSourceFromStunden(
           endTime: endTime,
           subject: stunde.name,
           recurrenceExceptionDates: isVertretung ? null : vertreteneTage
-            ?..addAll(schulfreieZeiten
-                .where((e) => //only works if multi day freie tage are from 0:00 to 23:59
-                    (firstTime.hour > e.$1.hour || (firstTime.hour == e.$1.hour && firstTime.minute >= e.$1.minute)) &&
-                    (endTime.hour < e.$2.hour || (endTime.hour == e.$2.hour && endTime.minute <= e.$2.minute)))
-                .map((e) => [for (DateTime i = e.$1; i.isBefore(e.$2); i = i.add(const Duration(days: 1))) i])
-                .expand((element) => element)),
+            ?..addAll(schulfreieZeiten.map((e) {
+              bool multiday = (e.$1.midnight().isBefore(e.$2.midnight()));
+              bool dayTimeStartsAfter = (firstTime.hour > e.$1.hour || (firstTime.hour == e.$1.hour && firstTime.minute >= e.$1.minute));
+              bool dayTimeEndsBefore = (endTime.hour < e.$2.hour || (endTime.hour == e.$2.hour && endTime.minute <= e.$2.minute));
+              return [
+              if(dayTimeStartsAfter && (multiday || dayTimeEndsBefore)) e.$1,
+              if(dayTimeEndsBefore &&  (multiday || dayTimeStartsAfter)) e.$2,
+              if(multiday) for (DateTime i = e.$1.add(const Duration(days: 1)); i.isBefore(e.$2.midnight()); i = i.add(const Duration(days: 1))) i
+            ];
+            }).expand((element) => element)),
           notes: stunde.vertretung.value?.toJSON(),
           recurrenceRule: stunde.vertretung.value != null
               ? null
