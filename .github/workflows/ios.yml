@@ -45,7 +45,7 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/PiusApp_Distribution_24_12.mobileprovision
 
       # Step 7: Configure Distribution Certificate
       - name: Configure Distribution Certificate
@@ -74,7 +74,7 @@ jobs:
           EXPORT_METHOD: "app-store"
           EXPORT_DESTINATION: "export"
           BUNDLE_ID: "de.equirinya.piusapp" #change this when adapting to another app
-          PROVISIONING_PROFILE: "profile.mobileprovision"
+          PROVISIONING_PROFILE: "PiusApp_Distribution_24_12.mobileprovision"
           TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           envsubst < ios/Runner/ExportOptions-Template.plist > ios/Runner/ExportOptions.plist
@@ -97,8 +97,8 @@ jobs:
         run: |
           APP_FILE=$(find $(pwd) -name "*.ipa")
           app-store-connect publish \
-            --api-key-id "$APPSTORE_API_KEY_ID" \
-            --api-key "$APPSTORE_API_PRIVATE_KEY" \
+            --key-id "$APPSTORE_API_KEY_ID" \
+            --private-key "$APPSTORE_API_PRIVATE_KEY" \
             --issuer-id "$APPSTORE_ISSUER_ID" \
             --path "$APP_FILE"
 
