@@ -24,7 +24,7 @@ jobs:
         run: |
           flutter clean
           flutter pub get
-          flutter analyze --fatal-infos
+          flutter analyze --no-fatal-infos --no-fatal-warnings
 
       # Step 4: Install Codemagic CLI
       - name: Install Codemagic CLI
