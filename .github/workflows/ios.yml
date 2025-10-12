@@ -105,8 +105,7 @@ jobs:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
-          APP_FILE=$(find $(pwd) -name "*.ipa")
-          xcrun altool --upload-app -f "$APP_FILE" -t ios --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
+          xcrun altool --upload-app -f build/ios/ipa/*.ipa -t ios --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
 
       # Check if release exists
       - name: Check Release
