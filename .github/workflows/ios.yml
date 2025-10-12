@@ -23,7 +23,7 @@ jobs:
         uses: flutter-actions/setup-flutter@v3
         with:
           channel: stable
-          version: 3.27.1  # Keep this up to date with flutter --version
+          version: 3.32.4  # Keep this up to date with flutter --version
 
       # Step 3: Install Dependencies
       - name: Install Dependencies
