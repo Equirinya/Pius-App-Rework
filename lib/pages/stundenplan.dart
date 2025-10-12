@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ionicons/ionicons.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import '../connection.dart';
 import '../database.dart';
 import 'vertretungsplan.dart';

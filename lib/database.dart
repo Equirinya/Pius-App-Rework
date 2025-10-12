@@ -2,7 +2,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'main.dart';
 
 

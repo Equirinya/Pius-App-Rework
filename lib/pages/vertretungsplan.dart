@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import '../database.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';

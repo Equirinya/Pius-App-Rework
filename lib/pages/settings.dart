@@ -11,7 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import '../database.dart';

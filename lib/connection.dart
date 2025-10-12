@@ -17,7 +17,7 @@ import 'package:html/parser.dart';
 import 'package:html/dom.dart' as DOM;
 import 'package:icalendar_parser/icalendar_parser.dart';
 import 'package:intl/intl.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
@@ -25,7 +25,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 const String baseUrl = "https://www.pius-gymnasium.de";
 const String stundenplanUrl = baseUrl + "/stundenplaene";
-const String vertretungsplanUrl = baseUrl + "/vertretungsplan";
+const String vertretungsplanUrl = baseUrl + "/vertretungsplan/piusapp.php";
 const String termineUrl = baseUrl + "/pius-kalender.ics";
 const String feiertagUrl = "https://get.api-feiertage.de/?states=nw";
 
