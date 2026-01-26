@@ -76,7 +76,7 @@ jobs:
           EXPORT_METHOD: "app-store"
           EXPORT_DESTINATION: "export"
           BUNDLE_ID: "de.equirinya.piusapp" # Change this when adapting to another app
-          PROVISIONING_PROFILE: "PiusApp Distribution 24_12"
+          PROVISIONING_PROFILE: "PiusAppDistribution26"
           TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           envsubst < ios/Runner/ExportOptions-Template.plist > ios/Runner/ExportOptions.plist
