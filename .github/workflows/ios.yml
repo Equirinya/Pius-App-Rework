@@ -2,7 +2,54 @@
 #https://canopas.com/automate-flutter-ios-app-deployment-with-github-actions-and-codemagic-cli-4d063ea6ef08
 #https://blog.okaryo.studio/en/20240911-flutter-ios-firebase-app-distribution-github-actions-not-auto-signing/
 
-#to create certificate: https://mzansibytes.com/2021/08/28/create-apple-developer-certificates-on-windows/
+### setup in appstoreconnect:
+#if not exisiting yet, create a distribution certificate: https://mzansibytes.com/2021/08/28/create-apple-developer-certificates-on-windows/, then [Convert]::ToBase64String([IO.File]::ReadAllBytes("ExportedCertificate.pfx")) | Out-File "ExportedCertificate_base64.txt"
+
+#create Identifier:  (APP-IDs/APP/) add Push Notifications, Sign In with Apple
+#then change bundle id in Step 8 below
+#create Provisioning Profile: Distribution/App Store Connect then [Convert]::ToBase64String([IO.File]::ReadAllBytes("AppName.mobileprovision")) | Out-File "AppName_base64.txt"
+#copy Provisioning Profile name to Step 5 & 8 below
+#create App in App Store Connect
+
+
+### necessary github action repository secrets:
+#TEAM_ID: https://appstoreconnect.apple.com/access/users
+
+#from: https://appstoreconnect.apple.com/access/integrations/api:
+#APPSTORE_ISSUER_ID
+#APPSTORE_API_KEY_ID
+#APPSTORE_API_PRIVATE_KEY: open p8 File with text editor and copy content //TODO with or without line breaks and start/end?
+
+#BUILD_CERTIFICATE_BASE64 #distribution certificate in base64 format (can be the same for many apps)
+#P12_PASSWORD #password for distribution certificate
+
+#BUILD_PROVISION_PROFILE_BASE64
+
+#KEYCHAIN_PASSWORD #can be set freely
+
+###necessary github action repository variables:
+#BUNDLE_ID
+#PROVISIONING_PROFILE_NAME
+#DEPLOYMENT_TARGET
+#FLUTTER_VERSION
+
+###make sure ios/Runner/ExportOptions-Template.plist exists
+
+##make sure ios/Runner.xcodeproj/project.pbxproj is configured correctly, that should be set by the ExportOption.plist but are currently not, see https://github.com/flutter/flutter/issues/113977
+#for all configurations where the bundleIdentifier does not end in RunnerTests these should be set:
+
+#CODE_SIGN_IDENTITY = "Apple Development";
+#"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";  #or IOS Distribution or Iphone Distribution
+#CODE_SIGN_STYLE = Manual;
+#PRODUCT_BUNDLE_IDENTIFIER = ; #set
+#DEVELOPMENT_TEAM = "";
+#"DEVELOPMENT_TEAM[sdk=iphoneos*]" = ; #set
+#IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+#PROVISIONING_PROFILE_SPECIFIER = "";
+#"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ""; #set
+
+
+### if youre using FirebaseFirestore including the precombiled binaries in the Podfile speeds up the build a lot: https://github.com/invertase/firestore-ios-sdk-frameworks
 
 name: iOS Build and Deploy
 
@@ -21,9 +68,11 @@ jobs:
       # Step 2: Set up Flutter SDK
       - name: Set up Flutter SDK
         uses: flutter-actions/setup-flutter@v3
+        env:
+          FLUTTER_VERSION: ${{ vars.FLUTTER_VERSION }}
         with:
           channel: stable
-          version: 3.32.4  # Keep this up to date with flutter --version
+          version: ${{ env.FLUTTER_VERSION }} # Keep this up to date with flutter --version
 
       # Step 3: Install Dependencies
       - name: Install Dependencies
@@ -45,9 +94,10 @@ jobs:
       - name: Configure Provisioning Profile
         env:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          PROVISIONING_PROFILE_NAME: ${{ vars.PROVISIONING_PROFILE_NAME }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/PiusAppDistribution26.mobileprovision
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/$PROVISIONING_PROFILE_NAME.mobileprovision
 
       # Step 6: Configure Distribution Certificate
       - name: Configure Distribution Certificate
@@ -59,6 +109,8 @@ jobs:
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > /tmp/certificate.p12
           security import /tmp/certificate.p12 -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $RUNNER_TEMP/app-signing.keychain-db
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $RUNNER_TEMP/app-signing.keychain-db
+          # List the certificate to verify it's there
+          security find-identity -v -p codesigning $RUNNER_TEMP/app-signing.keychain-db
 
       # Step 7: Parse Build Number and Name from pubspec.yaml
       - name: Parse Build Number and Name
@@ -69,26 +121,52 @@ jobs:
           BUILD_NUMBER=$(echo $VERSION_LINE | cut -d'+' -f2)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
 
       # Step 8: Generate ExportOptions.plist from Template
       - name: Generate ExportOptions.plist
         env:
           EXPORT_METHOD: "app-store"
           EXPORT_DESTINATION: "export"
-          BUNDLE_ID: "de.equirinya.piusapp" # Change this when adapting to another app
-          PROVISIONING_PROFILE: "PiusAppDistribution26"
+          BUNDLE_ID: ${{ vars.BUNDLE_ID }} # Change this when adapting to another app
+          PROVISIONING_PROFILE: ${{ vars.PROVISIONING_PROFILE_NAME }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           envsubst < ios/Runner/ExportOptions-Template.plist > ios/Runner/ExportOptions.plist
 
       # Step 9: Build IPA
       - name: Build IPA
+          #        env:
+          # These are forwarded by flutter -> xcodebuild
+          #but apparently applies to ALL targets including the Pod libraries. But Pod libraries (frameworks) should use automatic signing
+          #          FLUTTER_XCODE_DEVELOPMENT_TEAM: ${{ secrets.TEAM_ID }}
+          ##          FLUTTER_XCODE_CODE_SIGN_STYLE: "Manual"
+          #          FLUTTER_XCODE_PROVISIONING_PROFILE_SPECIFIER: ${{ vars.PROVISIONING_PROFILE_NAME }}
+          #          FLUTTER_XCODE_IPHONEOS_DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET }}
+          #          FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER: ${{ vars.BUNDLE_ID }}
+        # optional if you want to pin the code sign identity:
+        #          FLUTTER_XCODE_CODE_SIGN_IDENTITY: "iPhone Distribution"
         run: |
+          # Update pod repos
+          pod repo update --silent
+          
+          # Get Flutter dependencies
+          flutter pub get
+          
+          # Install pods with timeout protection
+          cd ios
+          pod install || exit 1
+          cd ..
+          
+          # Build the IPA (can add --verbose for more logging)
           flutter build ipa \
             --release \
+            --verbose \
             --build-number=$BUILD_NUMBER \
             --build-name=$VERSION \
             --export-options-plist=ios/Runner/ExportOptions.plist
+        timeout-minutes: 60
 
       # Step 10: Create API Key File
       - name: Create API Key File
@@ -113,7 +191,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "v$VERSION" 2>/dev/null; then
+          if gh release view "v${{ steps.version.outputs.version }}" 2>/dev/null; then
             echo "release_exists=true" >> $GITHUB_OUTPUT
           else
             echo "release_exists=false" >> $GITHUB_OUTPUT
@@ -127,12 +205,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v$VERSION
-          release_name: "Release v$VERSION"
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: "Release v${{ steps.version.outputs.version }}"
           draft: true
           prerelease: false
 
-      #Locate the ipa file
       - name: Locate IPA
         id: locate_ipa
         run: |
@@ -146,7 +223,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.locate_ipa.outputs.path }}
-          asset_name: PiusApp-v$VERSION.ipa
+          asset_name: App-v${{ steps.version.outputs.version }}.ipa
           asset_content_type: application/octet-stream
 
       # Step 13: Cleanup Keychain and Profiles
