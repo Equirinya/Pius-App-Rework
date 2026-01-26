@@ -1,0 +1,105 @@
+name: Android Build and Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android_deployment:
+    runs-on: windows-latest
+
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Java
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Step 3: Set up Flutter SDK
+      - name: Set up Flutter SDK
+        uses: flutter-actions/setup-flutter@v3
+        with:
+          channel: stable
+          version: 3.27.1  # Keep this up to date with flutter --version
+
+      # Step 4: Install Dependencies
+      - name: Install Dependencies
+        run: |
+          flutter clean
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      # Step 5: Setup Keystore
+      - name: Decode Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$env:KEYSTORE_BASE64" | Out-File -FilePath keystore_base64.txt
+          certutil -decode keystore_base64.txt android/app/keystore.jks
+
+      # Step 6: Create key.properties
+      - name: Create key.properties
+        run: |
+          Set-Content -Path android/key.properties -Value @"
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          "@
+
+      # Step 7: Parse Build Number and Name from pubspec.yaml
+      - name: Parse Build Number and Name
+        id: version
+        run: |
+          $VERSION_LINE = Get-Content pubspec.yaml | Select-String '^version:'
+          $VERSION = ($VERSION_LINE -split ' ')[1].Split('+')[0]
+          $BUILD_NUMBER = ($VERSION_LINE -split '\+')[1]
+          echo "VERSION=$VERSION" >> $env:GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $env:GITHUB_ENV
+
+      # Step 8: Build APK
+      - name: Build APK
+        run: |
+          flutter build apk --release `
+            --build-number=$env:BUILD_NUMBER `
+            --build-name=$env:VERSION
+
+      # Step 9: Build App Bundle
+      - name: Build App Bundle
+        run: |
+          flutter build appbundle --release `
+            --build-number=$env:BUILD_NUMBER `
+            --build-name=$env:VERSION
+
+      # Step 10: Upload to existing Release
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-release.apk
+          asset_name: app-v${{ env.VERSION }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Upload AAB to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: build/app/outputs/bundle/release/app-release.aab
+          asset_name: app-v${{ env.VERSION }}.aab
+          asset_content_type: application/x-authorware-bin
+
+      # Step 11: Cleanup
+      - name: Cleanup
+        if: always()
+        run: |
+          Remove-Item -Path android/app/keystore.jks -ErrorAction SilentlyContinue
+          Remove-Item -Path android/key.properties -ErrorAction SilentlyContinue
+          Remove-Item -Path keystore_base64.txt -ErrorAction SilentlyContinue
