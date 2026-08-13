@@ -8,6 +8,19 @@ import 'main.dart';
 
 part 'database.g.dart';
 
+/// The single source of truth for the Isar schema list.
+///
+/// This MUST be identical everywhere `Isar.open` is called. The background
+/// fetch headless task runs in a second FlutterEngine inside the *same*
+/// process, so opening the default instance with a different set of schemas
+/// than the main isolate used will fail.
+final List<CollectionSchema<dynamic>> isarSchemas = [
+  VertretungSchema,
+  StundeSchema,
+  ColorPaletteSchema,
+  NewsSchema,
+];
+
 @Collection()
 class Vertretung {
   late Id id = Isar.autoIncrement;

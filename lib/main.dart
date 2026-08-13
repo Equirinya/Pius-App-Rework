@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiusApp/background.dart';
 import 'package:PiusApp/pages/news.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -6,7 +8,6 @@ import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar_community/isar.dart';
@@ -36,7 +37,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final Isar isar = await Isar.open(
-    [VertretungSchema, StundeSchema, ColorPaletteSchema, NewsSchema],
+    isarSchemas,
     directory: (await getApplicationSupportDirectory()).path,
   );
 
@@ -46,19 +47,19 @@ void main() async {
     timeDilation = 1.0;
   }
 
-  if(Platform.isIOS || Platform.isAndroid) {
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-// initialise the plugin. app_icon needs to be a added as a drawable resource to the Android head project
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
-    const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
-      requestSoundPermission: false,
-      requestBadgePermission: false,
-      requestAlertPermission: false,);
-    const InitializationSettings initializationSettings =
-    InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  if (Platform.isIOS || Platform.isAndroid) {
+    // Initialise flutter_local_notifications. `ic_stat_icon_transparent` needs
+    // to exist as a drawable resource in the Android head project.
+    await initializeNotifications();
 
-    configureBackgroundFetch();
+    // Register the Android headless entry-point exactly once, as early as
+    // possible, so terminated-app fetches can find it.
+    registerBackgroundHeadlessTask();
+
+    // Deliberately not awaited so it doesn't delay the first frame.
+    // Also a no-op (and stops any scheduled task) when the user has
+    // background updates disabled.
+    unawaited(configureBackgroundFetch());
   }
 
   runApp(MyApp(

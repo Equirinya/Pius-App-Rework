@@ -1,64 +1,115 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' show DartPluginRegistrant;
 import 'package:PiusApp/connection.dart';
 import 'package:PiusApp/database.dart';
 import 'package:PiusApp/pages/settings.dart';
 import 'package:background_fetch/background_fetch.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void _onBackgroundFetch(String taskId) async {
+/// Per-isolate guards. The headless engine is a fresh isolate, so these are
+/// false there even if the main isolate already did the work.
+bool _notificationsInitialized = false;
+bool _dateFormattingInitialized = false;
+bool _headlessTaskRegistered = false;
 
-  final Isar isar = Isar.getInstance() ??
-      await Isar.open(
-        [VertretungSchema, StundeSchema, ColorPaletteSchema],
-        directory: (await getApplicationSupportDirectory()).path,
-      );
+/// Initialises flutter_local_notifications for the *current* isolate.
+///
+/// Calling `show()` without a prior `initialize()` is unsupported and is the
+/// classic reason notifications silently never appear from a headless task.
+Future<void> initializeNotifications() async {
+  if (_notificationsInitialized) return;
+  if (!(Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) return;
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_stat_icon_transparent');
+  const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
+    requestSoundPermission: false,
+    requestBadgePermission: false,
+    requestAlertPermission: false,
+  );
+  const InitializationSettings initializationSettings =
+      InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin, macOS: initializationSettingsDarwin);
 
-  List<Vertretung> alteVertretungen = await isar.vertretungs.where().findAll();
-  List<Vertretung> neueVertretungen = List.empty(growable: true);
+  await FlutterLocalNotificationsPlugin().initialize(settings: initializationSettings);
+  _notificationsInitialized = true;
+}
+
+/// `DateFormat(..., "de_DE")` throws a `LocaleDataException` unless the locale
+/// data has been loaded. In the main isolate `GlobalMaterialLocalizations`
+/// does this implicitly; in the headless isolate nothing does, so every
+/// notification build used to blow up before it was ever shown.
+Future<void> initializeGermanDateFormatting() async {
+  if (_dateFormattingInitialized) return;
+  await initializeDateFormatting('de_DE');
+  _dateFormattingInitialized = true;
+}
+
+Future<void> _onBackgroundFetch(String taskId) async {
   try {
+    // Plugins are not auto-registered in a headless isolate on all platforms.
+    WidgetsFlutterBinding.ensureInitialized();
+    DartPluginRegistrant.ensureInitialized();
+
+    await initializeGermanDateFormatting();
+    await initializeNotifications();
+
+    final Isar isar = Isar.getInstance() ??
+        await Isar.open(
+          isarSchemas,
+          directory: (await getApplicationSupportDirectory()).path,
+        );
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Respect the user's settings: don't fetch at all if background updates
+    // are off, and don't post notifications if the user disabled them.
+    if (!(prefs.getBool("background") ?? true)) return;
+    final bool showNotifications = prefs.getBool("showNotifications") ?? true;
+
+    List<Vertretung> alteVertretungen = await isar.vertretungs.where().findAll();
+    List<Vertretung> neueVertretungen = List.empty(growable: true);
+
     String vertretungsplanWebsite = await getVertretungsplanWebsite();
     neueVertretungen = await parseVertretungsplan(vertretungsplanWebsite, isar);
-  } on Exception {
-    if (kDebugMode) {
-      print("Error while fetching Vertretungsplan");
+
+    await prefs.setInt("lastBackgroundFetch", DateTime.now().millisecondsSinceEpoch);
+
+    if (!showNotifications) return;
+
+    neueVertretungen.removeWhere((neu) => alteVertretungen.any((alt) {
+          return listEquals(alt.stunden, neu.stunden) &&
+              alt.klasse == neu.klasse &&
+              alt.eva == neu.eva &&
+              alt.raum == neu.raum &&
+              alt.kurs == neu.kurs &&
+              alt.bemerkung == neu.bemerkung &&
+              alt.lehrkraft == neu.lehrkraft &&
+              alt.tag == neu.tag &&
+              listEquals(alt.hervorgehoben, neu.hervorgehoben) &&
+              alt.art == neu.art;
+        }));
+
+    String? stufe = prefs.getString("stundenplanStufe");
+    bool isOberstufe = prefs.getBool("stundenplanIsOberstufe") ?? false;
+
+    if (stufe != null && stufe.isNotEmpty) {
+      List<Stunde> stunden = await isar.stundes.where().findAll();
+      Set<String> kurse = stunden.map((e) {
+        List<String> split = e.name.split(" ");
+        return isOberstufe && split.length > 1 ? "${split[0]} ${split[1]}" : split[0];
+      }).toSet();
+      neueVertretungen.retainWhere((element) => element.klasse == stufe && (!isOberstufe || kurse.contains(element.kurs)));
     }
-    return;
-  }
 
-  neueVertretungen.removeWhere((neu) => alteVertretungen.any((alt) {
-        return listEquals(alt.stunden, neu.stunden) &&
-            alt.klasse == neu.klasse &&
-            alt.eva == neu.eva &&
-            alt.raum == neu.raum &&
-            alt.kurs == neu.kurs &&
-            alt.bemerkung == neu.bemerkung &&
-            alt.lehrkraft == neu.lehrkraft &&
-            alt.tag == neu.tag &&
-            listEquals(alt.hervorgehoben, neu.hervorgehoben) &&
-            alt.art == neu.art;
-      }));
-
-  String? stufe = prefs.getString("stundenplanStufe");
-  bool isOberstufe = prefs.getBool("stundenplanIsOberstufe") ?? false;
-
-  if (stufe != null && stufe.isNotEmpty) {
-    List<Stunde> stunden = await isar.stundes.where().findAll();
-    Set<String> kurse = stunden.map((e) {
-      List<String> split = e.name.split(" ");
-      return isOberstufe ? "${split[0]} ${split[1]}" : split[0];
-    }).toSet();
-    neueVertretungen.retainWhere((element) => element.klasse == stufe && (!isOberstufe || kurse.contains(element.kurs)));
-  }
-
-  if (neueVertretungen.isNotEmpty) {
+    // Must be awaited: `BackgroundFetch.finish` below lets the OS tear the
+    // process down, which would cancel any still-pending notification posts.
     for (Vertretung vertretung in neueVertretungen) {
       String tag = DateFormat('E dd.MM.', "de_DE").format(vertretung.tag);
       String stunden =
@@ -67,14 +118,23 @@ void _onBackgroundFetch(String taskId) async {
       String bemerkung = vertretung.bemerkung != null && vertretung.bemerkung!.trim().isNotEmpty ? " \n(${vertretung.bemerkung})" : "";
       String eva = vertretung.eva != null && vertretung.eva!.trim().isNotEmpty ? " \nEVA: ${vertretung.eva}" : "";
       String vertretungsText = "$tag $stunden Stunde: ${vertretung.art} ${vertretung.klasse} ${vertretung.kurs} $lehrkraft$bemerkung$eva";
-      showNotification("Neue Vertretung", vertretungsText);
+      await showNotification("Neue Vertretung", vertretungsText);
     }
+  } catch (e, s) {
+    // Catch *everything* (not just Exception). An escaping error used to skip
+    // `finish()` entirely, which the OS treats as a timeout and punishes by
+    // demoting the app's scheduling priority for all future fetches.
+    if (kDebugMode) {
+      print("[BackgroundFetch] error during fetch: $e");
+      print(s);
+    }
+  } finally {
+    await BackgroundFetch.finish(taskId);
   }
-
-  BackgroundFetch.finish(taskId);
 }
 
-void showNotification(String title, String body) async {
+Future<void> showNotification(String title, String body) async {
+  await initializeNotifications();
   FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   const AndroidNotificationDetails androidNotificationDetails = AndroidNotificationDetails(
@@ -91,7 +151,12 @@ void showNotification(String title, String body) async {
   const NotificationDetails notificationDetails =
       NotificationDetails(android: androidNotificationDetails, iOS: darwinPlatformChannelSpecifics, macOS: darwinPlatformChannelSpecifics);
 
-  await flutterLocalNotificationsPlugin.show(random.nextInt((pow(2, 31) - 1).toInt()), title, body, notificationDetails);
+  await flutterLocalNotificationsPlugin.show(
+    id: random.nextInt((pow(2, 31) - 1).toInt()),
+    title: title,
+    body: body,
+    notificationDetails: notificationDetails,
+  );
 
   const AndroidNotificationDetails androidNotificationGroupDetails = AndroidNotificationDetails(
     'new',
@@ -106,7 +171,12 @@ void showNotification(String title, String body) async {
   const NotificationDetails notificationGroupDetails =
   NotificationDetails(android: androidNotificationGroupDetails, iOS: darwinPlatformChannelSpecifics, macOS: darwinPlatformChannelSpecifics);
 
-  await flutterLocalNotificationsPlugin.show(0, "Neue Vertretungen", "Es gibt neue Vertretungen", notificationGroupDetails);
+  await flutterLocalNotificationsPlugin.show(
+    id: 0,
+    title: "Neue Vertretungen",
+    body: "Es gibt neue Vertretungen",
+    notificationDetails: notificationGroupDetails,
+  );
 }
 
 Future<bool> requestNotificationPermission() async {
@@ -131,13 +201,37 @@ Future<bool> requestNotificationPermission() async {
   return result ?? false;
 }
 
+/// Registers the Android headless entry-point. Must happen exactly once, as
+/// early as possible — not on every settings change.
+void registerBackgroundHeadlessTask() {
+  if (_headlessTaskRegistered || !Platform.isAndroid) return;
+  _headlessTaskRegistered = true;
+  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
+}
+
 // Platform messages are asynchronous, so we initialize in an async method.
 Future<void> configureBackgroundFetch() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  // Configure BackgroundFetch.
+
+  // Nothing to schedule if the user turned background updates off.
+  if (!(prefs.getBool("background") ?? true)) {
+    await BackgroundFetch.stop();
+    return;
+  }
+
+  // `durations` is keyed by String, so the old `durations[someInt]` lookup
+  // always returned null and the interval was silently pinned to 60 minutes
+  // no matter what the user picked. Index into the values instead.
+  int durationIndex = prefs.getInt("vertretungUpdateDuration") ?? 2;
+  if (durationIndex < 0 || durationIndex >= durations.length) durationIndex = 2;
+  // Android/iOS both floor the period at 15 minutes.
+  int intervalMinutes = max(15, durations.values.elementAt(durationIndex).inMinutes);
+
+  // Configure BackgroundFetch. Calling this again cancels the existing task
+  // and reschedules it with the new config.
   int status = await BackgroundFetch.configure(
     BackgroundFetchConfig(
-        minimumFetchInterval: durations[prefs.getInt("vertretungUpdateDuration") ?? 2]?.inMinutes ?? 60,
+        minimumFetchInterval: intervalMinutes,
         stopOnTerminate: false,
         enableHeadless: true,
         requiresBatteryNotLow: false,
@@ -149,7 +243,9 @@ Future<void> configureBackgroundFetch() async {
     _onBackgroundFetch,
     _onBackgroundFetchTimeout,
   );
-  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
+  if (kDebugMode) {
+    print('[BackgroundFetch] configure status: $status');
+  }
 }
 
 /// This event fires shortly before your task is about to timeout.  You must finish any outstanding work and call BackgroundFetch.finish(taskId).
@@ -172,31 +268,40 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
     if (kDebugMode) {
       print("[BackgroundFetch] Headless task timed-out: $taskId");
     }
-    BackgroundFetch.finish(taskId);
+    await BackgroundFetch.finish(taskId);
     return;
   }
-  _onBackgroundFetch(taskId);
+  await _onBackgroundFetch(taskId);
 }
 
-void enableBackground(bool enable) async {
+Future<void> enableBackground(bool enable) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //start stop
+  // The callers write the pref, but ordering isn't guaranteed — make sure
+  // configureBackgroundFetch() below sees the intended value.
+  await prefs.setBool("background", enable);
+
   if (enable) {
-    configureBackgroundFetch();
-    BackgroundFetch.start().then((int status) {
-    }).catchError((e) {
+    await configureBackgroundFetch();
+    try {
+      await BackgroundFetch.start();
+    } catch (e) {
       if (kDebugMode) {
         print('[BackgroundFetch] start FAILURE: $e');
       }
-    });
+    }
     if (prefs.getBool("showNotifications") ?? true) {
-      requestNotificationPermission();
+      await requestNotificationPermission();
     }
   } else {
-    BackgroundFetch.stop().then((int status) {
+    try {
+      int status = await BackgroundFetch.stop();
       if (kDebugMode) {
         print('[BackgroundFetch] stop success: $status');
       }
-    });
+    } catch (e) {
+      if (kDebugMode) {
+        print('[BackgroundFetch] stop FAILURE: $e');
+      }
+    }
   }
 }

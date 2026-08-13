@@ -157,7 +157,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ]
             ),
-            if (prefs.getBool("background") ?? true && (Platform.isAndroid || Platform.isIOS))
+            if ((Platform.isAndroid || Platform.isIOS) && (prefs.getBool("background") ?? true))
               (
                 "Benachrichtigungen",
                 [
@@ -170,6 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     (
                       true,
                       (value) {
+                        // pref is already persisted by the SwitchListTile handler
                         if (value) requestNotificationPermission();
                       }
                     )

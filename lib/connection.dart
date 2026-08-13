@@ -581,9 +581,7 @@ Future<http.Response> getSecuredPage(String url) async {
 }
 
 FlutterSecureStorage getSecurePrefs() {
-  AndroidOptions getAndroidOptions() => const AndroidOptions(
-        encryptedSharedPreferences: true,
-      );
+  AndroidOptions getAndroidOptions() => const AndroidOptions();
   const iOptions = IOSOptions(accessibility: KeychainAccessibility.first_unlock);
   final FlutterSecureStorage securePrefs = FlutterSecureStorage(aOptions: getAndroidOptions(), iOptions: iOptions);
   return securePrefs;
