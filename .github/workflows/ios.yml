@@ -74,6 +74,12 @@ jobs:
           channel: stable
           version: ${{ env.FLUTTER_VERSION }} # Keep this up to date with flutter --version
 
+      # Step 2b: Enable Swift Package Manager
+      # This is a machine-global Flutter setting (~/.flutter_settings), so it must be
+      # re-applied on every fresh CI runner. Required by plugins that ship SPM only (e.g. app_settings).
+      - name: Enable Swift Package Manager
+        run: flutter config --enable-swift-package-manager
+
       # Step 3: Install Dependencies
       - name: Install Dependencies
         run: |
@@ -153,12 +159,11 @@ jobs:
           
           # Get Flutter dependencies
           flutter pub get
-          
-          # Install pods with timeout protection
-          cd ios
-          pod install || exit 1
-          cd ..
-          
+
+          # NOTE: no manual `pod install` here. With Swift Package Manager enabled,
+          # flutter build runs pod install itself with the generated SPM config.
+          # Calling it manually beforehand fails for SPM-only plugins (app_settings).
+
           # Build the IPA (can add --verbose for more logging)
           flutter build ipa \
             --release \

@@ -29,7 +29,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<!-- Share-Links: piusapp://<version>/<data>
-	     See lib/share_link.dart and dev-docs/share-link.md. -->
+	     See lib/share_link.dart. -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

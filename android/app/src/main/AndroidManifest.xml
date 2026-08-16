@@ -31,7 +31,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <!-- Share-Links: piusapp://<version>/<data> - see
-                 lib/share_link.dart and dev-docs/share-link.md. The Activity is
+                 lib/share_link.dart. The Activity is
                  already launchMode="singleTop", so an incoming link reuses
                  the running instance and arrives via onNewIntent. -->
             <intent-filter android:autoVerify="false">
