@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stundenplan in der Pius App öffnen</title>
+<meta name="description" content="Öffne diesen geteilten Stundenplan in der Pius App.">
+<!--
+  Weiterleitungsseite für Share-Links der Pius App.
+
+  Ein geteilter Link sieht so aus:
+
+      https://equirinya.github.io/Pius-App-Rework/s/#1/<daten>
+
+  Der eigentliche Inhalt steht im **Fragment** (alles hinter dem `#`).
+  Browser senden Fragmente niemals an den Server - die Daten (und ein
+  eventuell mitgeteilter Pius-Login) verlassen das Gerät also nicht und
+  landen insbesondere nicht in irgendwelchen Server-Logs. Diese Seite baut
+  daraus rein clientseitig den App-Link `piusapp://1/<daten>` und ruft ihn
+  auf; den Rest macht das Betriebssystem.
+-->
+<style>
+  :root {
+    --blue: #3E6B8F;
+    --slate: #7A8CA0;
+    --ink: #1f2733;
+    --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--blue), var(--slate));
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 40px 28px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(16, 30, 45, 0.22);
+  }
+  .badge {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    background: linear-gradient(135deg, var(--blue), var(--slate));
+  }
+  h1 { margin: 0 0 8px; font-size: 24px; }
+  #status { margin: 0 0 28px; color: var(--muted); font-size: 15px; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px 18px;
+    margin: 10px 0;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform .05s ease, box-shadow .2s ease;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--blue), var(--slate));
+    box-shadow: 0 8px 20px rgba(62, 107, 143, 0.35);
+  }
+  .btn-store {
+    color: var(--ink);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+  }
+  .btn-store svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .divider {
+    margin: 28px 0 18px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .stores-label { font-weight: 600; color: var(--ink); }
+  footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  footer a { color: inherit; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  footer span { margin: 0 5px; opacity: .5; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="badge">📅</div>
+    <h1 id="title">Stundenplan übernehmen</h1>
+    <p id="status">Jemand hat dir einen oder mehrere Stundenpläne geschickt.</p>
+
+    <a id="openApp" class="btn btn-primary" href="#">In der Pius App öffnen</a>
+
+    <p class="divider">
+      <span class="stores-label">Du hast die App noch nicht?</span><br/>
+      Installiere sie zuerst und öffne diesen Link danach noch einmal.
+    </p>
+
+    <a id="play" class="btn btn-store" href="https://play.google.com/store/apps/details?id=de.equirinya.piusapp&amp;hl=de">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><path fill="#00D3FF" d="M48 59.5C42 65.3 38.5 74.3 38.5 86v340c0 11.7 3.5 20.7 9.5 26.5l1.9 1.8 190.5-190.5v-4.5L49.9 57.7 48 59.5z"/><path fill="#FFCE00" d="M303.8 327.9l-63.4-63.6v-4.5l63.5-63.6 1.4.8 75.2 42.7c21.5 12.2 21.5 32.2 0 44.5l-75.2 42.7-1.5.8z"/><path fill="#FF3A44" d="M305.2 327.1L240.4 262 48 454.3c7.1 7.5 18.8 8.4 32 1L305.2 327.1"/><path fill="#00F076" d="M305.2 196.9L80 69.6c-13.2-7.5-24.9-6.5-32 1l192.4 192.3 64.8-65.9z"/></svg>
+      Google Play
+    </a>
+    <a id="appstore" class="btn btn-store" href="https://apps.apple.com/de/app/pius-app-2/id6474478988">
+      <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM256.6 93.5c30-35.6 27.3-68 26.4-79.5-26.5 1.5-57.2 18-74.7 38.3-19.3 21.8-30.6 48.7-28.2 78.9 28.6 2.2 54.7-12.5 76.5-37.7z"/></svg>
+      App Store
+    </a>
+  </main>
+
+  <footer>
+    <a href="https://github.com/Equirinya/Pius-App-Rework">Über die Pius App</a><span>·</span>
+    <a href="mailto:equirinya@gmail.com?subject=Pius%20App%20Support">Support</a>
+  </footer>
+
+<script>
+  (function () {
+    // location.hash keeps the leading "#"; everything after it is "<version>/<data>".
+    var payload = window.location.hash.slice(1);
+    var status = document.getElementById("status");
+    var openApp = document.getElementById("openApp");
+
+    // Only offer the store that can actually install the app here. If the
+    // platform isn't recognisable (Desktop, unusual UA), both stay visible.
+    var ua = navigator.userAgent || navigator.vendor || "";
+    var isAndroid = /android/i.test(ua);
+    var isIOS = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document);
+
+    if (isAndroid) {
+      document.getElementById("appstore").hidden = true;
+    } else if (isIOS) {
+      document.getElementById("play").hidden = true;
+    }
+
+    if (!/^\d+\/[A-Za-z0-9_-]+$/.test(payload)) {
+      document.getElementById("title").textContent = "Link unvollständig";
+      status.textContent = "Dieser Link enthält keine Stundenplan-Daten. Vermutlich ist beim Kopieren das Ende abgeschnitten worden. Lass ihn dir am besten noch einmal schicken.";
+      openApp.hidden = true;
+      return;
+    }
+
+    var appLink = "piusapp://" + payload;
+    openApp.setAttribute("href", appLink);
+
+    // Try immediately as well - on a normal browser this hands off to the app
+    // without the extra tap. In-app browsers (WhatsApp, Instagram) block
+    // scheme changes without a user gesture, which is exactly what the button
+    // above is for, so a failure here is expected and harmless.
+    try {
+      window.location.replace(appLink);
+    } catch (e) {
+      /* button remains */
+    }
+
+    // If we're still here a moment later, the app probably isn't installed -
+    // or we're stuck in a messenger's in-app browser.
+    setTimeout(function () {
+      status.textContent = "Es passiert nichts? Dann ist die Pius App hier noch nicht installiert, oder du bist im eingebauten Browser eines Messengers. Öffne den Link dann über „Im Browser öffnen“ noch einmal.";
+    }, 1500);
+  })();
+</script>
+</body>
+</html>

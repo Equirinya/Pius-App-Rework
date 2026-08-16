@@ -19,7 +19,56 @@ final List<CollectionSchema<dynamic>> isarSchemas = [
   StundeSchema,
   ColorPaletteSchema,
   NewsSchema,
+  KonfigurationSchema,
 ];
+
+/// A single saved "Klasse/Kurse" profile (e.g. "Tom" -> Klasse 5A, or
+/// "Max" -> Q1 with a specific set of Kurse). The user can have any number
+/// of these; each gets its own live Stundenplan view.
+@Collection()
+class Konfiguration {
+  late Id id = Isar.autoIncrement;
+
+  /// Display name the user picked for this profile, e.g. "Tom".
+  late String name;
+
+  /// The Klasse (e.g. "5A") or Oberstufen-Stufe (e.g. "Q1") this profile is based on.
+  late String stufe;
+
+  late bool isOberstufe;
+
+  /// Selected Kurs-Kürzel for Oberstufe profiles. Empty for Klassen (the whole Klasse applies).
+  List<String> kurse = [];
+
+  late DateTime createdAt;
+
+  /// Manual sort order in the settings list.
+  int position = 0;
+
+  /// millisecondsSinceEpoch of the last successful incremental Stundenplan update for this profile.
+  int lastUpdateMillis = 0;
+
+  /// The school-year (the calendar year school resumes, i.e. the end of the
+  /// relevant Sommerferien) this Konfiguration was last confirmed/updated or
+  /// explicitly dismissed for. Used to stop nagging once handled.
+  int promotedForYear = 0;
+
+  /// The school-year the fields below were last computed for. See promotion.dart.
+  int promotionCheckedForYear = 0;
+
+  /// Whether a Stundenplan for [promotionCheckedForYear] was found online the
+  /// last time this was checked.
+  bool promotionPlanReady = false;
+
+  /// Suggested next Klasse/Stufe (e.g. "7A", "Q1"), null if none could be
+  /// determined (e.g. already in the final Oberstufen-Jahrgang).
+  String? promotionRecommendedStufe;
+  bool promotionRecommendedIsOberstufe = false;
+
+  // Sharing a Konfiguration between devices no longer goes through JSON -
+  // see lib/share_link.dart for the compact `piusapp://` link format that
+  // replaced it.
+}
 
 @Collection()
 class Vertretung {
@@ -66,6 +115,49 @@ class Vertretung {
   }
 }
 
+/// Strips a leading marker glyph from a raw Stundenplan line, e.g. the "*"
+/// PDF-Untis prints in front of Differenzierungskurse (courses split into
+/// language/level groups within one Klasse, e.g. "*F7 2 BSK 113"). Also
+/// covers the case where `PdfTextExtractor` can't map that marker glyph to a
+/// proper Unicode character (the source PDF embeds it as a small subset font
+/// without a usable ToUnicode map) and instead emits a stray lowercase
+/// letter glued onto the "*", e.g. "*yF7 2" - the real Fach-Kürzel always
+/// starts at the first uppercase letter, so anything before that between a
+/// leading "*" and it is junk from the marker glyph, never part of a real
+/// Fach name.
+String stripKursMarker(String name) => name.replaceFirst(RegExp(r'^\*[a-zäöüß]*(?=[A-ZÄÖÜ])'), '');
+
+/// Splits a Stundenplan line like "M GK Meier 205" (Oberstufen-Kurs) or
+/// "F7 2 BSK 113" (Sek-I-Differenzierungsgruppe) into its Fach-Kürzel - the
+/// part that actually identifies the course, e.g. "M GK" or "F7 2" - versus
+/// guessing purely from whether the Konfiguration is Oberstufe or not: a
+/// line is always "<Fach-Kürzel> <Lehrkraft> <Raum>", and the Fach-Kürzel
+/// itself is one word normally (e.g. "L7", "D", "GE") but two words whenever
+/// there's an extra Kursart/Gruppen-Kennung in front of the teacher (e.g.
+/// "GK"/"LK" in der Oberstufe, or the Gruppennummer "2"/"3" for
+/// Differenzierungskurse) - which shows up simply as one extra
+/// space-separated token, regardless of Stufe.
+String kursKuerzel(String name) {
+  List<String> tokens = stripKursMarker(name).split(" ");
+  int fachTokens = tokens.length >= 4 ? 2 : 1;
+  return tokens.take(fachTokens).join(" ");
+}
+
+/// Identifies one actual Kurs a student can pick, as opposed to [kursKuerzel]
+/// which only identifies the Fach/Kursart shared by *all* parallel groups of
+/// it. A line is always "<Fach-Kürzel> <Lehrkraft> <Raum>", and it's the
+/// Lehrkraft that distinguishes separate parallel Kurse of the same
+/// Fach-Kürzel (e.g. "GE G1 HDS 307" and "GE G1 PAF 307" are two different
+/// Kurse taught by different Lehrkräfte, not one Kurs meeting in two rooms) -
+/// only the trailing Raum varies between a single Kurs's own weekly
+/// timeslots (e.g. "GE G1 HDS 307" and "GE G1 HDS 306"), so dropping just
+/// that last token is what actually identifies "the same Kurs".
+String kursGruppe(String name) {
+  List<String> tokens = stripKursMarker(name).split(" ");
+  if (tokens.length <= 1) return tokens.join(" ");
+  return tokens.sublist(0, tokens.length - 1).join(" ");
+}
+
 @Collection()
 class Stunde {
   late Id id = Isar.autoIncrement;
@@ -75,6 +167,10 @@ class Stunde {
   late bool geradeWoche;
   late DateTime gueltigAb;
   DateTime? gueltigBis;
+
+  /// Which Konfiguration (saved profile) this lesson belongs to. 0 = unassigned/legacy.
+  @Index()
+  int konfigurationId = 0;
 
   IsarLink<Vertretung> vertretung = IsarLink();
 }

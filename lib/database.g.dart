@@ -9,6 +9,1797 @@ part of 'database.dart';
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
 
+extension GetKonfigurationCollection on Isar {
+  IsarCollection<Konfiguration> get konfigurations => this.collection();
+}
+
+const KonfigurationSchema = CollectionSchema(
+  name: r'Konfiguration',
+  id: 2413035547837965285,
+  properties: {
+    r'createdAt': PropertySchema(
+      id: 0,
+      name: r'createdAt',
+      type: IsarType.dateTime,
+    ),
+    r'isOberstufe': PropertySchema(
+      id: 1,
+      name: r'isOberstufe',
+      type: IsarType.bool,
+    ),
+    r'kurse': PropertySchema(
+      id: 2,
+      name: r'kurse',
+      type: IsarType.stringList,
+    ),
+    r'lastUpdateMillis': PropertySchema(
+      id: 3,
+      name: r'lastUpdateMillis',
+      type: IsarType.long,
+    ),
+    r'name': PropertySchema(
+      id: 4,
+      name: r'name',
+      type: IsarType.string,
+    ),
+    r'position': PropertySchema(
+      id: 5,
+      name: r'position',
+      type: IsarType.long,
+    ),
+    r'promotedForYear': PropertySchema(
+      id: 6,
+      name: r'promotedForYear',
+      type: IsarType.long,
+    ),
+    r'promotionCheckedForYear': PropertySchema(
+      id: 7,
+      name: r'promotionCheckedForYear',
+      type: IsarType.long,
+    ),
+    r'promotionPlanReady': PropertySchema(
+      id: 8,
+      name: r'promotionPlanReady',
+      type: IsarType.bool,
+    ),
+    r'promotionRecommendedIsOberstufe': PropertySchema(
+      id: 9,
+      name: r'promotionRecommendedIsOberstufe',
+      type: IsarType.bool,
+    ),
+    r'promotionRecommendedStufe': PropertySchema(
+      id: 10,
+      name: r'promotionRecommendedStufe',
+      type: IsarType.string,
+    ),
+    r'stufe': PropertySchema(
+      id: 11,
+      name: r'stufe',
+      type: IsarType.string,
+    )
+  },
+  estimateSize: _konfigurationEstimateSize,
+  serialize: _konfigurationSerialize,
+  deserialize: _konfigurationDeserialize,
+  deserializeProp: _konfigurationDeserializeProp,
+  idName: r'id',
+  indexes: {},
+  links: {},
+  embeddedSchemas: {},
+  getId: _konfigurationGetId,
+  getLinks: _konfigurationGetLinks,
+  attach: _konfigurationAttach,
+  version: '3.3.2',
+);
+
+int _konfigurationEstimateSize(
+  Konfiguration object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.kurse.length * 3;
+  {
+    for (var i = 0; i < object.kurse.length; i++) {
+      final value = object.kurse[i];
+      bytesCount += value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.name.length * 3;
+  {
+    final value = object.promotionRecommendedStufe;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.stufe.length * 3;
+  return bytesCount;
+}
+
+void _konfigurationSerialize(
+  Konfiguration object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeDateTime(offsets[0], object.createdAt);
+  writer.writeBool(offsets[1], object.isOberstufe);
+  writer.writeStringList(offsets[2], object.kurse);
+  writer.writeLong(offsets[3], object.lastUpdateMillis);
+  writer.writeString(offsets[4], object.name);
+  writer.writeLong(offsets[5], object.position);
+  writer.writeLong(offsets[6], object.promotedForYear);
+  writer.writeLong(offsets[7], object.promotionCheckedForYear);
+  writer.writeBool(offsets[8], object.promotionPlanReady);
+  writer.writeBool(offsets[9], object.promotionRecommendedIsOberstufe);
+  writer.writeString(offsets[10], object.promotionRecommendedStufe);
+  writer.writeString(offsets[11], object.stufe);
+}
+
+Konfiguration _konfigurationDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = Konfiguration();
+  object.createdAt = reader.readDateTime(offsets[0]);
+  object.id = id;
+  object.isOberstufe = reader.readBool(offsets[1]);
+  object.kurse = reader.readStringList(offsets[2]) ?? [];
+  object.lastUpdateMillis = reader.readLong(offsets[3]);
+  object.name = reader.readString(offsets[4]);
+  object.position = reader.readLong(offsets[5]);
+  object.promotedForYear = reader.readLong(offsets[6]);
+  object.promotionCheckedForYear = reader.readLong(offsets[7]);
+  object.promotionPlanReady = reader.readBool(offsets[8]);
+  object.promotionRecommendedIsOberstufe = reader.readBool(offsets[9]);
+  object.promotionRecommendedStufe = reader.readStringOrNull(offsets[10]);
+  object.stufe = reader.readString(offsets[11]);
+  return object;
+}
+
+P _konfigurationDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readDateTime(offset)) as P;
+    case 1:
+      return (reader.readBool(offset)) as P;
+    case 2:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 3:
+      return (reader.readLong(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readLong(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readBool(offset)) as P;
+    case 9:
+      return (reader.readBool(offset)) as P;
+    case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _konfigurationGetId(Konfiguration object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _konfigurationGetLinks(Konfiguration object) {
+  return [];
+}
+
+void _konfigurationAttach(
+    IsarCollection<dynamic> col, Id id, Konfiguration object) {
+  object.id = id;
+}
+
+extension KonfigurationQueryWhereSort
+    on QueryBuilder<Konfiguration, Konfiguration, QWhere> {
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+}
+
+extension KonfigurationQueryWhere
+    on QueryBuilder<Konfiguration, Konfiguration, QWhereClause> {
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhereClause> idEqualTo(
+      Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: id,
+        upper: id,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhereClause> idNotEqualTo(
+      Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhereClause> idGreaterThan(
+      Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhereClause> idLessThan(
+      Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterWhereClause> idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: lowerId,
+        includeLower: includeLower,
+        upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+}
+
+extension KonfigurationQueryFilter
+    on QueryBuilder<Konfiguration, Konfiguration, QFilterCondition> {
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      createdAtEqualTo(DateTime value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      createdAtGreaterThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      createdAtLessThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'createdAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      createdAtBetween(
+    DateTime lower,
+    DateTime upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'createdAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> idEqualTo(
+      Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      idGreaterThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> idLessThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      isOberstufeEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isOberstufe',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'kurse',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'kurse',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'kurse',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'kurse',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'kurse',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      kurseLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'kurse',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      lastUpdateMillisEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastUpdateMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      lastUpdateMillisGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastUpdateMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      lastUpdateMillisLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastUpdateMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      lastUpdateMillisBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastUpdateMillis',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> nameEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> nameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'name',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'name',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition> nameMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'name',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'name',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      nameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'name',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      positionEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'position',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      positionGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'position',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      positionLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'position',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      positionBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'position',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotedForYearEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotedForYearGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'promotedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotedForYearLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'promotedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotedForYearBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'promotedForYear',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionCheckedForYearEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotionCheckedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionCheckedForYearGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'promotionCheckedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionCheckedForYearLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'promotionCheckedForYear',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionCheckedForYearBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'promotionCheckedForYear',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionPlanReadyEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotionPlanReady',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedIsOberstufeEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotionRecommendedIsOberstufe',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'promotionRecommendedStufe',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'promotionRecommendedStufe',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'promotionRecommendedStufe',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeContains(String value,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'promotionRecommendedStufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'promotionRecommendedStufe',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'promotionRecommendedStufe',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      promotionRecommendedStufeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'promotionRecommendedStufe',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'stufe',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'stufe',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'stufe',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'stufe',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterFilterCondition>
+      stufeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'stufe',
+        value: '',
+      ));
+    });
+  }
+}
+
+extension KonfigurationQueryObject
+    on QueryBuilder<Konfiguration, Konfiguration, QFilterCondition> {}
+
+extension KonfigurationQueryLinks
+    on QueryBuilder<Konfiguration, Konfiguration, QFilterCondition> {}
+
+extension KonfigurationQuerySortBy
+    on QueryBuilder<Konfiguration, Konfiguration, QSortBy> {
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isOberstufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByIsOberstufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isOberstufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByLastUpdateMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUpdateMillis', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByLastUpdateMillisDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUpdateMillis', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'position', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPositionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'position', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotedForYear', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotedForYearDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotedForYear', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionCheckedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionCheckedForYear', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionCheckedForYearDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionCheckedForYear', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionPlanReady() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionPlanReady', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionPlanReadyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionPlanReady', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionRecommendedIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedIsOberstufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionRecommendedIsOberstufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedIsOberstufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionRecommendedStufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedStufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      sortByPromotionRecommendedStufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedStufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByStufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> sortByStufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stufe', Sort.desc);
+    });
+  }
+}
+
+extension KonfigurationQuerySortThenBy
+    on QueryBuilder<Konfiguration, Konfiguration, QSortThenBy> {
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByCreatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isOberstufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByIsOberstufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isOberstufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByLastUpdateMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUpdateMillis', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByLastUpdateMillisDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUpdateMillis', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'position', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPositionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'position', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotedForYear', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotedForYearDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotedForYear', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionCheckedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionCheckedForYear', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionCheckedForYearDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionCheckedForYear', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionPlanReady() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionPlanReady', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionPlanReadyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionPlanReady', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionRecommendedIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedIsOberstufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionRecommendedIsOberstufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedIsOberstufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionRecommendedStufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedStufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy>
+      thenByPromotionRecommendedStufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'promotionRecommendedStufe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByStufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stufe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QAfterSortBy> thenByStufeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stufe', Sort.desc);
+    });
+  }
+}
+
+extension KonfigurationQueryWhereDistinct
+    on QueryBuilder<Konfiguration, Konfiguration, QDistinct> {
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct> distinctByCreatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isOberstufe');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct> distinctByKurse() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'kurse');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByLastUpdateMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastUpdateMillis');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct> distinctByName(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'name', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct> distinctByPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'position');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByPromotedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'promotedForYear');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByPromotionCheckedForYear() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'promotionCheckedForYear');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByPromotionPlanReady() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'promotionPlanReady');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByPromotionRecommendedIsOberstufe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'promotionRecommendedIsOberstufe');
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct>
+      distinctByPromotionRecommendedStufe({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'promotionRecommendedStufe',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Konfiguration, Konfiguration, QDistinct> distinctByStufe(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'stufe', caseSensitive: caseSensitive);
+    });
+  }
+}
+
+extension KonfigurationQueryProperty
+    on QueryBuilder<Konfiguration, Konfiguration, QQueryProperty> {
+  QueryBuilder<Konfiguration, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Konfiguration, DateTime, QQueryOperations> createdAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<Konfiguration, bool, QQueryOperations> isOberstufeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isOberstufe');
+    });
+  }
+
+  QueryBuilder<Konfiguration, List<String>, QQueryOperations> kurseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'kurse');
+    });
+  }
+
+  QueryBuilder<Konfiguration, int, QQueryOperations>
+      lastUpdateMillisProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastUpdateMillis');
+    });
+  }
+
+  QueryBuilder<Konfiguration, String, QQueryOperations> nameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<Konfiguration, int, QQueryOperations> positionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'position');
+    });
+  }
+
+  QueryBuilder<Konfiguration, int, QQueryOperations> promotedForYearProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'promotedForYear');
+    });
+  }
+
+  QueryBuilder<Konfiguration, int, QQueryOperations>
+      promotionCheckedForYearProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'promotionCheckedForYear');
+    });
+  }
+
+  QueryBuilder<Konfiguration, bool, QQueryOperations>
+      promotionPlanReadyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'promotionPlanReady');
+    });
+  }
+
+  QueryBuilder<Konfiguration, bool, QQueryOperations>
+      promotionRecommendedIsOberstufeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'promotionRecommendedIsOberstufe');
+    });
+  }
+
+  QueryBuilder<Konfiguration, String?, QQueryOperations>
+      promotionRecommendedStufeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'promotionRecommendedStufe');
+    });
+  }
+
+  QueryBuilder<Konfiguration, String, QQueryOperations> stufeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'stufe');
+    });
+  }
+}
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
 extension GetVertretungCollection on Isar {
   IsarCollection<Vertretung> get vertretungs => this.collection();
 }
@@ -2003,18 +3794,23 @@ const StundeSchema = CollectionSchema(
       name: r'gueltigBis',
       type: IsarType.dateTime,
     ),
-    r'name': PropertySchema(
+    r'konfigurationId': PropertySchema(
       id: 3,
+      name: r'konfigurationId',
+      type: IsarType.long,
+    ),
+    r'name': PropertySchema(
+      id: 4,
       name: r'name',
       type: IsarType.string,
     ),
     r'stunden': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'stunden',
       type: IsarType.longList,
     ),
     r'tag': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'tag',
       type: IsarType.long,
     )
@@ -2024,7 +3820,21 @@ const StundeSchema = CollectionSchema(
   deserialize: _stundeDeserialize,
   deserializeProp: _stundeDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'konfigurationId': IndexSchema(
+      id: 8548624192511421978,
+      name: r'konfigurationId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'konfigurationId',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {
     r'vertretung': LinkSchema(
       id: 2386278722145345199,
@@ -2060,9 +3870,10 @@ void _stundeSerialize(
   writer.writeBool(offsets[0], object.geradeWoche);
   writer.writeDateTime(offsets[1], object.gueltigAb);
   writer.writeDateTime(offsets[2], object.gueltigBis);
-  writer.writeString(offsets[3], object.name);
-  writer.writeLongList(offsets[4], object.stunden);
-  writer.writeLong(offsets[5], object.tag);
+  writer.writeLong(offsets[3], object.konfigurationId);
+  writer.writeString(offsets[4], object.name);
+  writer.writeLongList(offsets[5], object.stunden);
+  writer.writeLong(offsets[6], object.tag);
 }
 
 Stunde _stundeDeserialize(
@@ -2076,9 +3887,10 @@ Stunde _stundeDeserialize(
   object.gueltigAb = reader.readDateTime(offsets[1]);
   object.gueltigBis = reader.readDateTimeOrNull(offsets[2]);
   object.id = id;
-  object.name = reader.readString(offsets[3]);
-  object.stunden = reader.readLongList(offsets[4]) ?? [];
-  object.tag = reader.readLong(offsets[5]);
+  object.konfigurationId = reader.readLong(offsets[3]);
+  object.name = reader.readString(offsets[4]);
+  object.stunden = reader.readLongList(offsets[5]) ?? [];
+  object.tag = reader.readLong(offsets[6]);
   return object;
 }
 
@@ -2096,10 +3908,12 @@ P _stundeDeserializeProp<P>(
     case 2:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readLongList(offset) ?? []) as P;
+      return (reader.readString(offset)) as P;
     case 5:
+      return (reader.readLongList(offset) ?? []) as P;
+    case 6:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2124,6 +3938,14 @@ extension StundeQueryWhereSort on QueryBuilder<Stunde, Stunde, QWhere> {
   QueryBuilder<Stunde, Stunde, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhere> anyKonfigurationId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'konfigurationId'),
+      );
     });
   }
 }
@@ -2189,6 +4011,96 @@ extension StundeQueryWhere on QueryBuilder<Stunde, Stunde, QWhereClause> {
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhereClause> konfigurationIdEqualTo(
+      int konfigurationId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'konfigurationId',
+        value: [konfigurationId],
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhereClause> konfigurationIdNotEqualTo(
+      int konfigurationId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'konfigurationId',
+              lower: [],
+              upper: [konfigurationId],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'konfigurationId',
+              lower: [konfigurationId],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'konfigurationId',
+              lower: [konfigurationId],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'konfigurationId',
+              lower: [],
+              upper: [konfigurationId],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhereClause> konfigurationIdGreaterThan(
+    int konfigurationId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'konfigurationId',
+        lower: [konfigurationId],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhereClause> konfigurationIdLessThan(
+    int konfigurationId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'konfigurationId',
+        lower: [],
+        upper: [konfigurationId],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterWhereClause> konfigurationIdBetween(
+    int lowerKonfigurationId,
+    int upperKonfigurationId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'konfigurationId',
+        lower: [lowerKonfigurationId],
+        includeLower: includeLower,
+        upper: [upperKonfigurationId],
         includeUpper: includeUpper,
       ));
     });
@@ -2372,6 +4284,60 @@ extension StundeQueryFilter on QueryBuilder<Stunde, Stunde, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterFilterCondition> konfigurationIdEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'konfigurationId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterFilterCondition>
+      konfigurationIdGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'konfigurationId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterFilterCondition> konfigurationIdLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'konfigurationId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterFilterCondition> konfigurationIdBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'konfigurationId',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -2753,6 +4719,18 @@ extension StundeQuerySortBy on QueryBuilder<Stunde, Stunde, QSortBy> {
     });
   }
 
+  QueryBuilder<Stunde, Stunde, QAfterSortBy> sortByKonfigurationId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'konfigurationId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterSortBy> sortByKonfigurationIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'konfigurationId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Stunde, Stunde, QAfterSortBy> sortByName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.asc);
@@ -2827,6 +4805,18 @@ extension StundeQuerySortThenBy on QueryBuilder<Stunde, Stunde, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Stunde, Stunde, QAfterSortBy> thenByKonfigurationId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'konfigurationId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QAfterSortBy> thenByKonfigurationIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'konfigurationId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Stunde, Stunde, QAfterSortBy> thenByName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.asc);
@@ -2868,6 +4858,12 @@ extension StundeQueryWhereDistinct on QueryBuilder<Stunde, Stunde, QDistinct> {
   QueryBuilder<Stunde, Stunde, QDistinct> distinctByGueltigBis() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'gueltigBis');
+    });
+  }
+
+  QueryBuilder<Stunde, Stunde, QDistinct> distinctByKonfigurationId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'konfigurationId');
     });
   }
 
@@ -2913,6 +4909,12 @@ extension StundeQueryProperty on QueryBuilder<Stunde, Stunde, QQueryProperty> {
   QueryBuilder<Stunde, DateTime?, QQueryOperations> gueltigBisProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'gueltigBis');
+    });
+  }
+
+  QueryBuilder<Stunde, int, QQueryOperations> konfigurationIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'konfigurationId');
     });
   }
 

@@ -37,17 +37,31 @@ class _NewsPageState extends State<NewsPage> {
   late SharedPreferences prefs;
   bool isShowingImage = false;
 
+  /// Einmal pro Seite statt bei jedem build() neu - ein FocusNode im build
+  /// wird nie disposed und hängt sich bei jedem Rebuild neu in den
+  /// Focus-Baum ein.
+  final FocusNode _detailFocusNode = FocusNode();
+
   @override
   initState() {
     super.initState();
     asyncInit();
   }
 
+  @override
+  void dispose() {
+    _detailFocusNode.dispose();
+    super.dispose();
+  }
+
   void asyncInit() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('newsUpdateStart') ?? true) {
-      ConnectivityResult connectivityResult = (await Connectivity().checkConnectivity()).first;
-      if ((!(prefs.getBool("vertretungUpdateWifi") ?? false) || connectivityResult == ConnectivityResult.wifi)) {
+      // Was reading "vertretungUpdateWifi", so the News section's own
+      // "News Update Wifi Only" switch did nothing at all and News instead
+      // followed the Vertretungsplan setting. That switch defaults to true.
+      final List<ConnectivityResult> connectivity = await Connectivity().checkConnectivity();
+      if (!(prefs.getBool("newsUpdateWifi") ?? true) || connectivity.contains(ConnectivityResult.wifi)) {
         updateNews();
       }
     }
@@ -69,9 +83,36 @@ class _NewsPageState extends State<NewsPage> {
     setState(() {
       loading = true;
     });
+    // Alles ab hier kann werfen (kein Netz, DNS-Fehler, kaputtes JSON, ein
+    // Feld das die API anders liefert als erwartet). Ohne dieses try/finally
+    // wurde `loading` in dem Fall nie zurückgesetzt - danach beantwortete
+    // jeder weitere Refresh-Tap nur noch mit "Updated bereits..." und die
+    // News-Seite liess sich bis zum Neustart der App nicht mehr aktualisieren.
+    try {
+      await _fetchNews(laodAll);
+    } catch (e) {
+      if (kDebugMode) print('Fehler beim Laden der News: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fehler beim Laden der News. Prüfe deine Internetverbindung.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      } else {
+        loading = false;
+      }
+    }
+  }
+
+  Future<void> _fetchNews(bool laodAll) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String newsUrl = prefs.getString('website_news_termine') ?? 'https://www.pius-gymnasium.de/wp-json/wp/v2/posts';
-    Uri uri = Uri.parse(newsUrl);
+    Uri uri = Uri.parse(prefs.getString('website_news_termine') ?? newsUrl);
     Map<String, String> queryParameters = {};
 
     int numberOfNews = widget.isar.news.where().countSync();
@@ -100,20 +141,21 @@ class _NewsPageState extends State<NewsPage> {
           ),
         );
       }
-      setState(() {
-        loading = false;
-      });
       return;
     }
 
     dynamic newsJson = jsonDecode(response.body);
     if (newsJson is List) {
       List<News> newNews = newsJson.map((json) {
-        dynamic image = json["featured_image_src_large"];
-        if (image is List) {
-          image = image[0];
-        } else {
-          image = null;
+        // `image[0]` warf bei einer leeren Liste einen RangeError und riss
+        // damit das Laden *aller* News mit runter; kam die URL als blanker
+        // String statt als Liste, wurde das Bild kommentarlos verworfen.
+        dynamic imageRaw = json["featured_image_src_large"];
+        String? image;
+        if (imageRaw is List) {
+          image = imageRaw.isEmpty ? null : imageRaw.first?.toString();
+        } else if (imageRaw is String && imageRaw.isNotEmpty) {
+          image = imageRaw;
         }
         String? teaser = parseFragment(json['excerpt']['rendered']).text;
         if (teaser?.isEmpty ?? false) {
@@ -137,30 +179,20 @@ class _NewsPageState extends State<NewsPage> {
         print('News JSON is not a list');
         print(newsJson);
       }
-      if (Map.from(newsJson).containsKey('code')) {
-        // if(Map.from(newsJson)['code'] == 'rest_post_invalid_page_number') {
-        //   //TODO
-        //   return;
-        // }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Fehler beim Laden der News: ${Map.from(newsJson)['message']}'),
-            ),
-          );
-        }
-      }
+      // `Map.from(newsJson)` warf hier selbst, wenn die Antwort weder Liste
+      // noch Map war. Ausserdem wurden zwei SnackBars hintereinander gezeigt,
+      // die zweite mit `response.statusCode` - der an dieser Stelle immer 200
+      // ist ("Fehler beim Laden der News: 200").
+      String? apiMeldung;
+      if (newsJson is Map && newsJson.containsKey('code')) apiMeldung = newsJson['message']?.toString();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Fehler beim Laden der News: ${response.statusCode}'),
+            content: Text('Fehler beim Laden der News: ${apiMeldung ?? 'unerwartete Antwort der Website'}'),
           ),
         );
       }
     }
-    setState(() {
-      loading = false;
-    });
   }
 
   // Future<void> updateNews() async {
@@ -331,7 +363,7 @@ class _NewsPageState extends State<NewsPage> {
   Widget buildNewsDetailPage(List<News> news, int index, BuildContext context) {
     Size size = MediaQuery.of(context).size;
     return KeyboardListener(
-      focusNode: FocusNode(),
+      focusNode: _detailFocusNode,
       autofocus: true,
       onKeyEvent: (event) {
         if (event.logicalKey == LogicalKeyboardKey.escape && !isShowingImage) {
@@ -390,9 +422,15 @@ class _NewsPageState extends State<NewsPage> {
               padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 128.0, top: 16),
               child: HtmlWidget(
                 news[index].content,
-                onTapUrl: (url) {
-                  launchUrl(Uri.parse(url));
-                  return true;
+                onTapUrl: (url) async {
+                  // launchUrl throws a PlatformException when no app can handle
+                  // the URL. Unawaited it became an unhandled async error.
+                  try {
+                    return await launchUrl(Uri.parse(url));
+                  } catch (e) {
+                    if (kDebugMode) print("Could not launch $url: $e");
+                    return false;
+                  }
                 },
                 textStyle: Theme.of(context).textTheme.bodyLarge,
                 onTapImage: (p0) {

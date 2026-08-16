@@ -1,5 +1,8 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '11.0'
+# Must match IPHONEOS_DEPLOYMENT_TARGET in Runner.xcodeproj, otherwise the pods
+# are built against a different minimum than the app. 13.0 is the floor imposed
+# by the dependencies: mobile_scanner >= 7.1 and share_plus >= 13 both require
+# iOS 13, as do current Flutter versions.
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

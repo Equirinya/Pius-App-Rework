@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:PiusApp/course_selection.dart';
 import 'package:PiusApp/pages/settings.dart';
 import 'package:PiusApp/utils.dart';
 import 'package:flutter/cupertino.dart';
@@ -14,7 +15,6 @@ import '../database.dart';
 import 'vertretungsplan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import 'dart:io' show Platform;
 
@@ -45,10 +45,12 @@ class _StundenplanPageState extends State<StundenplanPage> {
   bool? vertretungLoading = false;
   CalendarController controller = CalendarController();
   late CalendarView view;
+  int selectedKonfigurationIndex = 0;
 
   @override
   void initState() {
     SharedPreferences.getInstance().then((value) {
+      if (!mounted) return;
       prefs = value;
       int? stundenplanView = prefs.getInt("stundenplanView");
       if(stundenplanView == null) prefs.setInt("stundenplanView", (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ? 2 : 1);
@@ -58,25 +60,46 @@ class _StundenplanPageState extends State<StundenplanPage> {
               ? CalendarView.week
               : CalendarView.workWeek;
       initialized = true;
+      selectedKonfigurationIndex = prefs.getInt("stundenplanSelectedKonfigurationIndex") ?? 0;
       setState(() {});
     });
-    widget.vertretungsLoading.addListener(() {
-      if (!(widget.vertretungsLoading.value ?? false))
-        vertretungLoading = widget.vertretungsLoading.value;
-      setState(() {});
-    });
-    widget.calendarLoading.addListener(() {
-      if (!(widget.calendarLoading.value ?? false))
-        calendarLoading = widget.calendarLoading.value;
-      setState(() {});
-    });
+    // Benannte Methoden statt anonymer Closures: nur so lassen sie sich in
+    // dispose() wieder abmelden. Die Notifier gehören dem Elternwidget und
+    // leben länger als diese Seite - jeder Rebuild hängte vorher einen
+    // weiteren, unentfernbaren Listener an, der nach dem dispose weiter
+    // setState() aufrief.
+    widget.vertretungsLoading.addListener(_onVertretungsLoadingChanged);
+    widget.calendarLoading.addListener(_onCalendarLoadingChanged);
     super.initState();
+  }
+
+  void _onVertretungsLoadingChanged() {
+    if (!mounted) return;
+    if (!(widget.vertretungsLoading.value ?? false)) vertretungLoading = widget.vertretungsLoading.value;
+    setState(() {});
+  }
+
+  void _onCalendarLoadingChanged() {
+    if (!mounted) return;
+    if (!(widget.calendarLoading.value ?? false)) calendarLoading = widget.calendarLoading.value;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.vertretungsLoading.removeListener(_onVertretungsLoadingChanged);
+    widget.calendarLoading.removeListener(_onCalendarLoadingChanged);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (!initialized) return const Center(child: CircularProgressIndicator());
-    bool emptyCalendar = widget.isar.stundes.where().countSync() == 0;
+
+    List<Konfiguration> konfigurationen = widget.isar.konfigurations.where().findAllSync()..sort((a, b) => a.position.compareTo(b.position));
+    if (selectedKonfigurationIndex >= konfigurationen.length) selectedKonfigurationIndex = max(0, konfigurationen.length - 1);
+    Konfiguration? konfiguration = konfigurationen.isEmpty ? null : konfigurationen[selectedKonfigurationIndex];
+    bool emptyCalendar = konfigurationen.isEmpty;
 
     ButtonStyle selectedButtonStyle = ButtonStyle(
       backgroundColor: MaterialStateProperty.all(Theme.of(context).colorScheme.surfaceVariant),
@@ -90,10 +113,38 @@ class _StundenplanPageState extends State<StundenplanPage> {
       child: Scaffold(
           appBar: AppBar(
             title: Text(
-              "${DateFormat("LLLL", "DE_de").format(controller.displayDate ?? DateTime.now())} ${controller.displayDate?.year.toString().substring(2) ?? ""}",
+              "${DateFormat("LLLL", "de_DE").format(controller.displayDate ?? DateTime.now())} ${controller.displayDate?.year.toString().substring(2) ?? ""}",
               overflow: TextOverflow.fade,
             ),
             surfaceTintColor: Colors.transparent,
+            bottom: konfigurationen.length > 1
+                ? PreferredSize(
+                    preferredSize: const Size.fromHeight(48),
+                    child: SizedBox(
+                      height: 48,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        children: [
+                          for (final (index, k) in konfigurationen.indexed)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                              child: ChoiceChip(
+                                label: Text(k.name),
+                                selected: index == selectedKonfigurationIndex,
+                                onSelected: (_) {
+                                  setState(() {
+                                    selectedKonfigurationIndex = index;
+                                  });
+                                  prefs.setInt("stundenplanSelectedKonfigurationIndex", index);
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  )
+                : null,
             actions: [
               IconButton(
                 onPressed: () => controller.displayDate = DateTime.now().copyWith(hour: 7, minute: 30),
@@ -332,264 +383,41 @@ class _StundenplanPageState extends State<StundenplanPage> {
                     color: Colors.transparent,
                     border: null,
                   ),
-                  dataSource: _getCalendarDataSource(
-                      isar: widget.isar,
-                      prefs: prefs,
-                      stufe: prefs.getString("stundenplanStufe") ?? "",
-                      isOberstufe: prefs.getBool("stundenplanIsOberstufe") ?? false),
+                  dataSource: konfiguration == null
+                      ? getCalendarDataSourceFromStunden(stunden: const [])
+                      : getCalendarDataSourceForKonfiguration(isar: widget.isar, prefs: prefs, konfiguration: konfiguration),
                 ),
               ),
             ],
           ),
           floatingActionButton: emptyCalendar
               ? FloatingActionButton.extended(
-                  onPressed: () => addStundenplan(context, widget.isar, prefs, () {
+                  onPressed: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(builder: (context) => CourseSelection(isar: widget.isar)));
                     setState(() {});
                     widget.calendarLoading.value = false;
-                  }),
+                  },
                   tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
                   label: const Text("Klasse/Stufe auswählen"),
                   icon: const Icon(Ionicons.options_outline),
                 )
-              : null
-          // : FloatingActionButton(
-          //     onPressed: addStundenplan,
-          //     tooltip: 'Klicke hier um eine Klasse oder Stufe auszuwählen um sie in deinem Stundenplan anzuzeigen',
-          //     child: const Icon(Ionicons.options_outline)),
+              : null,
           ),
     );
   }
 }
 
-void addStundenplan(BuildContext context, Isar isar, SharedPreferences prefs, VoidCallback refresh,
-    [Function(List<Stunde> stunden, String stufe)? customKursSelection]) async {
-  List<String> klassen = List.empty(growable: true);
-  List<String> oberstufen = List.empty(growable: true);
-  List<String> stufen = List.empty(growable: true);
-  bool loading = false;
-  PdfDocument? klassenplan;
-  PdfDocument? oberstufenplan;
-
-  showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-            title: const Text("Klasse/Stufe auswählen"),
-            icon: const Icon(Ionicons.options_outline),
-            content: StatefulBuilder(
-              builder: (context, listSetState) {
-                if (stufen.isEmpty) {
-                  (() async {
-                    try {
-                      (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
-
-                      klassen = await compute(getStufen, klassenplan);
-                      oberstufen = await compute(getStufen, oberstufenplan);
-                      if (context.mounted) {
-                        listSetState(() {
-                          stufen.addAll(klassen);
-                          stufen.addAll(oberstufen);
-                        });
-                      }
-                    } catch (e) {
-                      if (kDebugMode) {
-                        print(e);
-                      }
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                      ));
-                    }
-                  }).call();
-                  return const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CupertinoActivityIndicator(),
-                  );
-                }
-                if (loading || klassenplan == null || oberstufenplan == null) {
-                  return const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CupertinoActivityIndicator(),
-                  );
-                }
-                return SingleChildScrollView(
-                    child: Column(
-                  children: [
-                    for (int i = 0; i < stufen.length; i++)
-                      ListTile(
-                        title: Text(stufen[i]),
-                        onTap: () async {
-                          if (i < klassen.length) {
-                            listSetState(() {
-                              loading = true;
-                            });
-                            setStundenplan(await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, isar, prefs, refresh);
-                            if (context.mounted) Navigator.pop(context);
-                          } else {
-                            listSetState(() {
-                              loading = true;
-                            });
-                            List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
-                            if (context.mounted) Navigator.pop(context);
-                            if (customKursSelection != null) {
-                              customKursSelection(stunden, oberstufen[i - klassen.length]);
-                            } else {
-                              showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, isar, prefs, refresh);
-                            }
-                          }
-                        },
-                      ),
-                  ],
-                ));
-              },
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Abbrechen"))],
-          ));
-}
-
-void setStundenplan(List<Stunde> stunden, String stufe, bool isOberstufe, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
-  await isar.writeTxn(() async {
-    await isar.stundes.clear();
-    await isar.stundes.putAll(stunden);
-  });
-  await prefs.setString("stundenplanStufe", stufe);
-  await prefs.setBool("stundenplanIsOberstufe", isOberstufe);
-  refresh();
-  try {
-    await Future.delayed(const Duration(seconds: 10));
-    await updateStundenplan(isar);
-  } catch (e) {
-    if (kDebugMode) print(e);
-  }
-  refresh();
-}
-
-Future<bool> showStundenplanSelection(
-    List<Stunde> stunden, String stufe, BuildContext Function() getContext, Isar isar, SharedPreferences prefs, VoidCallback refresh) async {
-  DateTime initialDisplayDate = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1, hours: DateTime.now().hour, minutes: DateTime.now().minute));
-  if (stunden.isNotEmpty && initialDisplayDate.isBefore(stunden.first.gueltigAb)) {
-    DateTime firstTime = stunden.first.gueltigAb;
-    initialDisplayDate =
-        firstTime.add(const Duration(days: 7)).subtract(Duration(days: firstTime.weekday - 1, hours: firstTime.hour, minutes: firstTime.minute));
-  }
-  CalendarDataSource dataTableSource = _getCalendarDataSourceFromStunden(stunden: stunden, realTime: false);
-  Map<Stunde, bool> activeStunden = {for (var item in stunden) item: false};
-  var result = await Navigator.push(getContext(), MaterialPageRoute(builder: (context) {
-    CalendarController calendarController = CalendarController();
-    bool flyby = false;
-    bool visitedFriday = false;
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text("Wähle deine Kurse"),
-          ),
-          body: SfCalendar(
-            initialDisplayDate: initialDisplayDate,
-            view: CalendarView.day,
-            controller: calendarController,
-            onViewChanged: (viewChangedDetails) {
-              if (viewChangedDetails.visibleDates.first.weekday == 5) {
-                setState(() {
-                  visitedFriday = true;
-                });
-              }
-              if (flyby) return;
-              if (viewChangedDetails.visibleDates.first.weekday == 6) {
-                flyby = true;
-                calendarController.forward!();
-                calendarController.forward!();
-                flyby = false;
-              }
-              if (viewChangedDetails.visibleDates.first.weekday == 7) {
-                flyby = true;
-                calendarController.backward!();
-                calendarController.backward!();
-                flyby = false;
-              }
-            },
-            dataSource: dataTableSource,
-            allowViewNavigation: false,
-            showCurrentTimeIndicator: false,
-            showTodayButton: false,
-            showWeekNumber: true,
-            appointmentBuilder: (context, calendarAppointmentDetails) {
-              Appointment appointment = ((calendarAppointmentDetails.appointments.first) as Appointment);
-              bool? active = activeStunden[stunden.firstWhere((element) => element.name == appointment.subject)];
-              if (active == null) throw StateError("couldnt find active Stunde");
-              return GestureDetector(
-                onTap: () => setState(() {
-                  List<Stunde> stundenToActivate = stunden
-                      .where((element) => element.name.split(" ").getRange(0, 2).join(" ") == appointment.subject.split(" ").getRange(0, 2).join(" "))
-                      .toList();
-                  for (Stunde stunde in stundenToActivate) {
-                    activeStunden[stunde] = !active;
-                  }
-                }),
-                child: Container(
-                  decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                      ),
-                      color: active ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface,
-                      borderRadius: const BorderRadius.all(Radius.circular(4))),
-                  width: calendarAppointmentDetails.bounds.width,
-                  height: calendarAppointmentDetails.bounds.height,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(1.0),
-                      child: Text(
-                        appointment.subject,
-                        style: const TextStyle(),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-            timeSlotViewSettings: const TimeSlotViewSettings(
-              timeFormat: "HH",
-              startHour: 0,
-              endHour: 12,
-              timeIntervalHeight: 80,
-            ),
-            viewHeaderStyle: const ViewHeaderStyle(
-              dateTextStyle: TextStyle(color: Colors.transparent, fontSize: 0),
-            ),
-            minDate: initialDisplayDate,
-            maxDate: initialDisplayDate.add(const Duration(days: 12)).subtract(const Duration(minutes: 1)),
-            selectionDecoration: const BoxDecoration(
-              color: Colors.transparent,
-              border: null,
-            ),
-          ),
-          floatingActionButton: AnimatedScale(
-            duration: const Duration(milliseconds: 300),
-            scale: visitedFriday ? 1 : 0,
-            child: FloatingActionButton.extended(
-              heroTag: null,
-              onPressed: () {
-                setStundenplan((activeStunden..removeWhere((key, value) => !value)).keys.toList(), stufe, true, isar, prefs, refresh);
-                Navigator.of(context).pop(true);
-              },
-              icon: const Icon(Ionicons.checkmark),
-              label: const Text("Kursauswahl bestätigen"),
-            ),
-          ),
-        );
-      },
-    );
-  }));
-  if (result is bool) return result;
-  return false;
-}
-
-_AppointmentDataSource _getCalendarDataSource({required Isar isar, required SharedPreferences prefs, required String stufe, required bool isOberstufe}) {
-  List<Stunde> stunden = isar.stundes.where().findAllSync();
-  Set<String> kurse = stunden.map((e) {
-    List<String> split = e.name.split(" ");
-    return isOberstufe ? "${split[0]} ${split[1]}" : split[0];
-  }).toSet();
+_AppointmentDataSource getCalendarDataSourceForKonfiguration(
+    {required Isar isar, required SharedPreferences prefs, required Konfiguration konfiguration}) {
+  String stufe = konfiguration.stufe;
+  bool isOberstufe = konfiguration.isOberstufe;
+  List<Stunde> stunden = isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).findAllSync();
+  // Derived from the actual token count of each line (see kursKuerzel() in
+  // database.dart), not from `isOberstufe` - Sek-I-Differenzierungskurse
+  // (e.g. "F7 2 BSK 113" for a Klasse) also have a two-word Fach-Kürzel, so
+  // guessing "one word unless Oberstufe" used to merge distinct
+  // Differenzierungsgruppen (e.g. "F7 2" and "F7 3") into a single "F7".
+  Set<String> kurse = stunden.map((e) => kursKuerzel(e.name)).toSet();
   List<Vertretung> vertretungen =
       isar.vertretungs.filter().klasseEqualTo(stufe).findAllSync().where((element) => !isOberstufe || kurse.contains(element.kurs)).toList();
   List<Stunde> vertretungsStunden = vertretungen
@@ -626,7 +454,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
         String substring = e.subject.substring(sI);
         String? stufe = substring.trim().split(" ").firstOrNull;
         //sort out alle nicht betroffenen stufen
-        if (stufe != null && stufe.toLowerCase() != prefs.getString("stundenplanStufe")?.toLowerCase()) return null;
+        if (stufe != null && stufe.toLowerCase() != konfiguration.stufe.toLowerCase()) return null;
       }
 
       if (e.subject.toLowerCase().contains("ferien")) return (e.startTime, e.endTime);
@@ -680,7 +508,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
   if (prefs.getBool("showTermine") ?? true) toShowTermine.addAll(piusTermine);
   if (prefs.getBool("showFeiertage") ?? true) toShowTermine.addAll(feiertagTermine);
 
-  return _getCalendarDataSourceFromStunden(
+  return getCalendarDataSourceFromStunden(
       stunden: stunden..addAll(vertretungsStunden),
       vertretungen: vertretungen,
       isOberstufe: isOberstufe,
@@ -688,7 +516,7 @@ _AppointmentDataSource _getCalendarDataSource({required Isar isar, required Shar
       termine: toShowTermine);
 }
 
-_AppointmentDataSource _getCalendarDataSourceFromStunden(
+_AppointmentDataSource getCalendarDataSourceFromStunden(
     {required List<Stunde> stunden,
     List<(DateTime, DateTime)> schulfreieZeiten = const <(DateTime, DateTime)>[],
     List<Appointment> termine = const <Appointment>[],
@@ -704,8 +532,13 @@ _AppointmentDataSource _getCalendarDataSourceFromStunden(
   List<Appointment> sommerferien = termine.where((element) => element.subject.contains("Sommerferien")).toList();
 
   for (Stunde stunde in stunden) {
-    final (int uStunde, int uMinute) = uhrzeiten[stunde.stunden.first];
-    final (int eStunde, int eMinute) = uhrzeiten[stunde.stunden.last];
+    // `stundenZeiten` kennt 11 Stunden. Eine Vertretung, die auf der Website
+    // für eine spätere Stunde eingetragen ist (oder eine leere Stundenliste),
+    // hat hier sonst einen RangeError geworfen - und damit den kompletten
+    // Stundenplan statt nur dieses einen Eintrags unbrauchbar gemacht.
+    if (stunde.stunden.isEmpty) continue;
+    final (int uStunde, int uMinute) = uhrzeiten[stunde.stunden.first.clamp(0, uhrzeiten.length - 1)];
+    final (int eStunde, int eMinute) = uhrzeiten[stunde.stunden.last.clamp(0, uhrzeiten.length - 1)];
 
     DateTime firstTime = getNextDateTimeWithWeekdayAndHour(stunde.gueltigAb, stunde.tag, uStunde, uMinute);
     if ((weekNumber(firstTime) % 2 == 0) != stunde.geradeWoche) {
@@ -718,12 +551,11 @@ _AppointmentDataSource _getCalendarDataSourceFromStunden(
     bool isVertretung = stunde.vertretung.value != null;
     List<DateTime> vertreteneTage = List.empty(growable: true);
     if (!isVertretung) {
-      List<String> split = stunde.name.split(" ");
+      String kuerzel = kursKuerzel(stunde.name);
       Map<DateTime, List<int>> vertreteneStunden = {};
       for (Vertretung vertretung in vertretungen) {
         if (vertretung.tag.weekday == stunde.tag &&
-            (vertretung.kurs.split("→").length >= 2 ? vertretung.kurs.split("→")[0].trim() : vertretung.kurs) ==
-                (isOberstufe ? "${split[0]} ${split[1]}" : split[0])) {
+            (vertretung.kurs.split("→").length >= 2 ? vertretung.kurs.split("→")[0].trim() : vertretung.kurs) == kuerzel) {
           if (vertreteneStunden[vertretung.tag] == null) vertreteneStunden[vertretung.tag] = List.empty(growable: true);
           vertreteneStunden[vertretung.tag]!.addAll(vertretung.stunden);
         }

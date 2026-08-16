@@ -1,15 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:PiusApp/pages/settings.dart';
 import 'package:PiusApp/pages/stundenplan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -27,9 +23,26 @@ const String baseUrl = "https://www.pius-gymnasium.de";
 const String stundenplanUrl = baseUrl + "/stundenplaene";
 const String vertretungsplanUrl = baseUrl + "/vertretungsplan/piusapp.php";
 const String termineUrl = baseUrl + "/pius-kalender.ics";
+const String newsUrl = baseUrl + "/wp-json/wp/v2/posts";
 const String feiertagUrl = "https://get.api-feiertage.de/?states=nw";
 
 class ColorChangedNotification extends Notification {}
+
+/// Repariert eine Vertretungsplan-URL, die durch den falschen Default in den
+/// "Erweiterten Einstellungen" festgeschrieben wurde.
+///
+/// Dort stand als Vorgabe ".../vertretungsplan" statt ".../vertretungsplan/
+/// piusapp.php". Der Dialog schreibt beim Bestätigen immer, also reichte
+/// einmal Öffnen + "Bestätigen", um die kaputte URL dauerhaft zu speichern -
+/// danach kam nur noch normales HTML zurück und der Vertretungsplan blieb
+/// leer, ohne Weg zurück in der UI. Betrifft nur genau diesen einen Wert;
+/// eine bewusst selbst gesetzte andere URL bleibt unangetastet.
+Future<void> repairVertretungsplanUrlIfNeeded(SharedPreferences prefs) async {
+  const String kaputterDefault = baseUrl + "/vertretungsplan";
+  if (prefs.getString("website_url_vertretungsplan") == kaputterDefault) {
+    await prefs.remove("website_url_vertretungsplan");
+  }
+}
 
 Future<List<Appointment>> getPiusTermine() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -42,7 +55,7 @@ Future<List<Appointment>> getPiusTermine() async {
         if (e["type"] != "VEVENT") return null;
         DateTime startTime = DateTime.parse((e["dtstart"] as IcsDateTime).dt);
         DateTime endTime = DateTime.parse((e["dtend"] as IcsDateTime).dt);
-        bool isAllDay = (startTime.hour == 0 && startTime.minute == 0 && endTime.hour == 0 && endTime.hour == 0);
+        bool isAllDay = (startTime.hour == 0 && startTime.minute == 0 && endTime.hour == 0 && endTime.minute == 0);
         String subject = e["summary"];
         return Appointment(
           startTime: startTime,
@@ -112,7 +125,13 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
     if (klassenplaene.length == 1)
       klassenplan = klassenplaene.first.$4;
     else
-      klassenplan = klassenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+      // Absteigend nach "gültig ab" sortiert, also ist der erste Treffer der
+      // aktuell gültige Plan. Sind ausnahmsweise *alle* Pläne erst in der
+      // Zukunft gültig (kommt kurz vor Schuljahresbeginn vor, wenn der alte
+      // Plan schon von der Seite genommen wurde), gibt es keinen Treffer -
+      // dann den zuerst in Kraft tretenden nehmen statt mit StateError
+      // abzustürzen.
+      klassenplan = klassenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now()), orElse: () => klassenplaene.last).$4;
 
     List<(DateTime starting, DateTime updated, bool oberstufe, String url)> oberstufenplaene =
         (stundenplaene.where((element) => element.$3).toList()..sort((a, b) => -a.$1.compareTo(b.$1)));
@@ -121,7 +140,8 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
     if (oberstufenplaene.length == 1)
       oberstufenplan = oberstufenplaene.first.$4;
     else
-      oberstufenplan = oberstufenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now())).$4;
+      // Siehe Klassenplan oben.
+      oberstufenplan = oberstufenplaene.firstWhere((element) => element.$1.isBefore(DateTime.now()), orElse: () => oberstufenplaene.last).$4;
 
     return (PdfDocument(inputBytes: (await getSecuredPage(klassenplan)).bodyBytes), PdfDocument(inputBytes: (await getSecuredPage(oberstufenplan)).bodyBytes));
   } catch (e, s) {
@@ -130,26 +150,76 @@ Future<(PdfDocument klassenplan, PdfDocument oberstufenplan)> getCurrentStundenp
   }
 }
 
-Future<void> updateStundenplan(Isar isar) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? stufe = prefs.getString("stundenplanStufe");
-  bool? isOberstufe = prefs.getBool("stundenplanIsOberstufe");
-
-  if (stufe == null || isOberstufe == null || stufe.isEmpty) throw Exception("No stufe found");
-  if (isOberstufe && isar.stundes.where().isEmptySync()) throw Exception("No selected courses found to update from");
-
-  List<String> kurse = isar.stundes.where().nameProperty().findAllSync().toSet().toList();
-  if (kurse.isEmpty) {
-    var (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
-    setStundenplan(
-      await compute(getStundenPlan, (stufe, klassenplan, isOberstufe)),
-      stufe,
-      isOberstufe,
-      isar,
-      prefs,
-      () {},
-    );
+/// Downloads and writes the full Stunden list for [konfiguration] using an
+/// already-fetched [plan] PDF (shared between all Konfigurationen of the
+/// same Klassen-/Oberstufenplan so it's only ever downloaded once).
+Future<void> populateKonfiguration(Isar isar, Konfiguration konfiguration, PdfDocument? plan) async {
+  List<Stunde> stunden = await compute(getStundenPlan, (konfiguration.stufe, plan, konfiguration.isOberstufe));
+  if (konfiguration.isOberstufe && konfiguration.kurse.isNotEmpty) {
+    stunden.retainWhere((element) => konfiguration.kurse.contains(element.name));
   }
+  for (Stunde stunde in stunden) {
+    stunde.konfigurationId = konfiguration.id;
+  }
+  await isar.writeTxn(() async {
+    await isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).deleteAll();
+    await isar.stundes.putAll(stunden);
+  });
+}
+
+/// Persists a (new or edited) [konfiguration] and immediately (re-)populates
+/// its Stunden from [plan]. Returns the Konfiguration with its assigned id.
+Future<Konfiguration> saveKonfiguration(Isar isar, Konfiguration konfiguration, PdfDocument? plan) async {
+  await isar.writeTxn(() async {
+    await isar.konfigurations.put(konfiguration);
+  });
+  await populateKonfiguration(isar, konfiguration, plan);
+  return konfiguration;
+}
+
+/// Persists a (new or edited) [konfiguration] using a [stunden] list that has
+/// already been parsed (e.g. by the Kurse-Auswahl step), instead of
+/// re-parsing the Stundenplan PDF again. Callers that already have the
+/// matching Stunden in hand should always prefer this over [saveKonfiguration]
+/// - re-running the PDF parse a second time is the main reason saving used
+/// to feel slow (or occasionally hang).
+Future<Konfiguration> saveKonfigurationWithStunden(Isar isar, Konfiguration konfiguration, List<Stunde> stunden) async {
+  for (Stunde stunde in stunden) {
+    stunde.id = Isar.autoIncrement;
+  }
+  await isar.writeTxn(() async {
+    await isar.konfigurations.put(konfiguration);
+    for (Stunde stunde in stunden) {
+      stunde.konfigurationId = konfiguration.id;
+    }
+    await isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).deleteAll();
+    await isar.stundes.putAll(stunden);
+  });
+  return konfiguration;
+}
+
+Future<void> deleteKonfiguration(Isar isar, int id) async {
+  await isar.writeTxn(() async {
+    await isar.stundes.filter().konfigurationIdEqualTo(id).deleteAll();
+    await isar.konfigurations.delete(id);
+  });
+}
+
+/// Incrementally updates a single Konfiguration's Stunden, carrying over the
+/// "gültig ab"/"gültig bis" stitching so past and future Stundenplan
+/// versions keep showing correctly. Mirrors the old single-profile
+/// updateStundenplan(), just scoped to one Konfiguration at a time.
+Future<void> updateKonfiguration(Isar isar, Konfiguration konfiguration) async {
+  String stufe = konfiguration.stufe;
+  bool isOberstufe = konfiguration.isOberstufe;
+
+  List<Stunde> existingStunden = isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).findAllSync();
+  if (existingStunden.isEmpty) {
+    var (klassenplan, oberstufenplan) = await getCurrentStundenplaene();
+    await populateKonfiguration(isar, konfiguration, isOberstufe ? oberstufenplan : klassenplan);
+    return;
+  }
+
   DOM.Document document = parse(await getStundenplanWebsite());
 
   List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = await getStundenplanLinks(document);
@@ -157,9 +227,9 @@ Future<void> updateStundenplan(Isar isar) async {
   if (stundenplaene.isEmpty) throw Exception("No stundenplan found");
   stundenplaene.sort((a, b) => -a.$1.compareTo(b.$1));
 
-  int lastUpdate = prefs.getInt("stundenplanLastUpdate") ?? 0;
+  int lastUpdate = konfiguration.lastUpdateMillis;
 
-  List<DateTime> existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+  List<DateTime> existingGueltigAb = existingStunden.map((e) => e.gueltigAb).toSet().toList();
   DateTime newestExisting = existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value);
   List<DateTime> neueGueltigAb = stundenplaene.map((e) => e.$1).toList();
 
@@ -186,57 +256,151 @@ Future<void> updateStundenplan(Isar isar) async {
 
   for (DateTime gueltigAb in toDelete) {
     await isar.writeTxn(() async {
-      await isar.stundes.filter().gueltigAbEqualTo(gueltigAb).deleteAll();
+      await isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).gueltigAbEqualTo(gueltigAb).deleteAll();
     });
   }
-  existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+  existingGueltigAb = isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).findAllSync().map((e) => e.gueltigAb).toSet().toList();
   for (var (DateTime gueltigAb, DateTime updated, bool oberstufe, String url) in toAdd) {
     if (existingGueltigAb.isNotEmpty) {
-      List<Stunde> toUpdateStunden =
-          isar.stundes.filter().gueltigAbEqualTo(existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value)).findAllSync();
+      List<Stunde> toUpdateStunden = isar.stundes
+          .filter()
+          .konfigurationIdEqualTo(konfiguration.id)
+          .gueltigAbEqualTo(existingGueltigAb.reduce((value, element) => value.isBefore(element) ? element : value))
+          .findAllSync();
 
       await isar.writeTxn(() async {
         await isar.stundes.putAll(toUpdateStunden.map((e) => e..gueltigBis = gueltigAb).toList());
       });
-      existingGueltigAb = isar.stundes.where().gueltigAbProperty().findAllSync().toSet().toList();
+      existingGueltigAb = isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).findAllSync().map((e) => e.gueltigAb).toSet().toList();
     }
 
     List<Stunde> stunden = await compute(getStundenPlan, (stufe, PdfDocument(inputBytes: (await getSecuredPage(url)).bodyBytes), isOberstufe));
 
-    if (isOberstufe) stunden.retainWhere((element) => kurse.contains(element.name));
+    if (isOberstufe && konfiguration.kurse.isNotEmpty) stunden.retainWhere((element) => konfiguration.kurse.contains(element.name));
+    for (Stunde stunde in stunden) {
+      stunde.konfigurationId = konfiguration.id;
+    }
     await isar.writeTxn(() async {
       await isar.stundes.putAll(stunden);
     });
   }
 
-  prefs.setInt("stundenplanLastUpdate", stundenplaene.map((e) => e.$2.millisecondsSinceEpoch).reduce(max));
+  konfiguration.lastUpdateMillis = stundenplaene.map((e) => e.$2.millisecondsSinceEpoch).reduce(max);
+  await isar.writeTxn(() async {
+    await isar.konfigurations.put(konfiguration);
+  });
 }
+
+/// Refreshes every saved Konfiguration. Downloads each Klassen-/Oberstufenplan
+/// only once regardless of how many Konfigurationen use it.
+Future<void> refreshAllConfigurations(Isar isar) async {
+  List<Konfiguration> konfigurationen = isar.konfigurations.where().findAllSync();
+  if (konfigurationen.isEmpty) return;
+  for (Konfiguration konfiguration in konfigurationen) {
+    try {
+      await updateKonfiguration(isar, konfiguration);
+    } catch (e) {
+      if (kDebugMode) print("Fehler beim Aktualisieren von Konfiguration '${konfiguration.name}': $e");
+    }
+  }
+}
+
+/// One-time migration for users upgrading from the single-profile version of
+/// the app: turns the previously active Stundenplan (tracked via
+/// SharedPreferences + unscoped Stunde rows) into a proper Konfiguration.
+Future<void> migrateLegacyStundenplanIfNeeded(Isar isar, SharedPreferences prefs) async {
+  // Only ever needed once: as soon as at least one Konfiguration exists
+  // (whether from this migration, onboarding, or a QR import) there is
+  // nothing left to migrate.
+  if (isar.konfigurations.where().countSync() > 0) return;
+  String? stufe = prefs.getString("stundenplanStufe");
+  bool? isOberstufe = prefs.getBool("stundenplanIsOberstufe");
+  // Nothing was ever selected on this install (fresh install) - nothing to carry over.
+  if (stufe == null || stufe.isEmpty) return;
+
+  List<Stunde> legacyStunden = isar.stundes.filter().konfigurationIdEqualTo(0).findAllSync();
+  // Even if the lessons themselves haven't been (re-)downloaded yet, keep the
+  // user's Klasse/Stufe pick so nothing is lost - the next background/manual
+  // refresh will populate the Stunden for it automatically.
+  List<String> kurse = (isOberstufe ?? false) ? legacyStunden.map((e) => e.name).toSet().toList() : [];
+
+  Konfiguration konfiguration = Konfiguration()
+    ..name = stufe
+    ..stufe = stufe
+    ..isOberstufe = isOberstufe ?? false
+    ..kurse = kurse
+    ..createdAt = DateTime.now()
+    ..position = 0;
+
+  await isar.writeTxn(() async {
+    await isar.konfigurations.put(konfiguration);
+    if (legacyStunden.isNotEmpty) {
+      for (Stunde stunde in legacyStunden) {
+        stunde.konfigurationId = konfiguration.id;
+      }
+      await isar.stundes.putAll(legacyStunden);
+    }
+  });
+}
+
 
 Future<List<(DateTime starting, DateTime updated, bool oberstufe, String url)>> getStundenplanLinks(DOM.Document document) async {
   List<(DateTime starting, DateTime updated, bool oberstufe, String url)> stundenplaene = List.empty(growable: true);
   SharedPreferences prefs = await SharedPreferences.getInstance();
   final europeanDateFormatter = DateFormat('dd.MM.yyyy');
 
+  String stundenplanUrlMaybeOverriden = prefs.getString("website_url_stundenplan") ?? stundenplanUrl;
+  if (!stundenplanUrlMaybeOverriden.endsWith("/")) stundenplanUrlMaybeOverriden += "/";
+
   for (DOM.Element element in document.body?.querySelectorAll("a") ?? []) {
-    if (element.attributes["href"]?.isEmpty ?? true) throw Exception("No href in links");
-    String stundenplanUrlMaybeOverriden = prefs.getString("website_url_stundenplan") ?? stundenplanUrl;
-    if (!stundenplanUrlMaybeOverriden.endsWith("/")) stundenplanUrlMaybeOverriden += "/";
+    // Alles, was nicht wie ein Stundenplan-Eintrag aussieht (Navigation,
+    // Footer, Anker, Zurück-Links, ...), wird übersprungen statt den ganzen
+    // Parse abzubrechen. Vorher riss ein einziges fremdes <a> - oder ein
+    // Eintrag ohne erkennbares Datum - die komplette Stundenplan- UND
+    // Schuljahreswechsel-Erkennung mit runter. Kommt am Ende gar nichts
+    // zusammen, wird weiter unten trotzdem geworfen.
+    String? href = element.attributes["href"];
+    if (href == null || href.isEmpty) continue;
 
     String name = element.text;
-    int parseStart = name.indexOf("ab") + 2;
-    while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
-    DateTime starting = DateTime.parse(name.substring(parseStart, parseStart + 10));
-
-    parseStart = name.indexOf("Stand") + 5;
-    while (parseStart < name.length && [" ", ":"].contains(name[parseStart])) parseStart++;
-    DateTime updated = europeanDateFormatter.parse(name.substring(parseStart, parseStart + 10));
+    DateTime? starting = _parseDatumNach(name, "ab", europeanDateFormatter);
+    if (starting == null) continue;
+    DateTime? updated = _parseDatumNach(name, "Stand", europeanDateFormatter);
+    if (updated == null) continue;
 
     bool oberstufe = name.toLowerCase().contains("oberstufe") || name.toLowerCase().contains("q1");
-    if (!oberstufe && !name.toLowerCase().contains("klasse"))
-      throw Exception("Stundenplan welcher weder als Klasse noch Oberstufe identifizierbar ist gefunden");
-    stundenplaene.add((starting, updated, oberstufe, Uri.parse(stundenplanUrlMaybeOverriden).resolve(element.attributes["href"]!).toString()));
+    if (!oberstufe && !name.toLowerCase().contains("klasse")) continue;
+
+    stundenplaene.add((starting, updated, oberstufe, Uri.parse(stundenplanUrlMaybeOverriden).resolve(href).toString()));
   }
+  if (stundenplaene.isEmpty) throw Exception("Keine Stundenpläne auf der Seite gefunden");
   return stundenplaene;
+}
+
+/// Liest das Datum, das im Linktext direkt hinter [marker] steht, z.B. das
+/// "2023-11-06" bzw. "03.11.2023" in
+/// `Klassenpläne (SI) - ab 2023-11-06.pdf (Stand: 03.11.2023)`.
+///
+/// Akzeptiert bewusst beide Schreibweisen (ISO und deutsch), egal hinter
+/// welchem Marker sie steht: die Seite benutzt heute je Marker eine andere,
+/// und ein Wechsel soll nicht sofort alles lahmlegen. Gibt `null` zurück,
+/// wenn der Marker fehlt oder dahinter kein Datum steht - der Aufrufer
+/// überspringt den Link dann.
+DateTime? _parseDatumNach(String name, String marker, DateFormat europeanDateFormatter) {
+  int markerIndex = name.indexOf(marker);
+  if (markerIndex == -1) return null;
+  int start = markerIndex + marker.length;
+  while (start < name.length && (name[start] == " " || name[start] == ":")) start++;
+  if (start + 10 > name.length) return null;
+  String datum = name.substring(start, start + 10);
+
+  DateTime? iso = DateTime.tryParse(datum);
+  if (iso != null) return iso;
+  try {
+    return europeanDateFormatter.parseStrict(datum);
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<List<String>> getStufen(PdfDocument? plan) async {
@@ -290,7 +454,7 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
       index = 6;
     }
     int startSearchDays = index;
-    while (!lines[index].text.startsWith("Mo Di") && index < lines.length - 1) {
+    while (index < lines.length - 1 && !lines[index].text.startsWith("Mo Di")) {
       index++;
     }
     if (index - startSearchDays > 4) throw Exception("Tage nicht gefunden");
@@ -302,7 +466,7 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
     }
     index++;
     List<double> stundenYAbstand = List.empty(growable: true);
-    while (lines[index].text.length <= 2 && int.tryParse(lines[index].text) != null && index < lines.length - 1) {
+    while (index < lines.length - 1 && lines[index].text.length <= 2 && int.tryParse(lines[index].text) != null) {
       int stunde = int.parse(lines[index].text);
       if (stunde != stundenYAbstand.length + 1) throw Exception("Stundenreihenfolge durcheinandergekommen");
       stundenYAbstand.add(lines[index].bounds.centerRight.dy);
@@ -311,7 +475,7 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
 
     List<double> stundenWithAveragesYAbstand = generateInBetweenAverages(stundenYAbstand);
     List<List<TextLine>> linesInDays = [for (int i = 0; i < tageXAbstand.length; i++) List.empty(growable: true)];
-    while (!lines[index].text.contains("Kalenderwoche") && index < lines.length - 1) {
+    while (index < lines.length - 1 && !lines[index].text.contains("Kalenderwoche")) {
       String text = lines[index].text;
       if (!(text.length == 1 && (text[0] == "A" || text[0] == "B"))) {
         int tag = findClosestMatchIndex(lines[index].bounds.bottomCenter.dx, tageXAbstand) + 1;
@@ -319,49 +483,102 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
       }
       index++;
     }
-    List<TextLine> stundenInBlock = List.empty(growable: true);
+    // --- Blockbildung ---------------------------------------------------
+    // Untis stapelt alle parallel laufenden Kurse einer Zelle untereinander.
+    // Ob ein Block eine Einzel- oder eine Doppelstunde ist, ergibt sich aus
+    // der Mitte des *gesamten* Blocks - deshalb muss die Gruppierung stimmen.
+    //
+    // Frueher wurde dafuer getestet, ob der Abstand zweier Zeilen kleiner ist
+    // als die Zeilenhoehe. Das hatte bei 9pt-Text nur ~0.4pt Reserve
+    // (Zeilenabstand 8.64pt gegen Zeilenhoehe 9.00pt). Seit Untis den
+    // Zeilenabstand auf 9.36pt vergroessert hat, ist der Test immer falsch:
+    // jede Zeile wird zu einem eigenen "Block", und in Zellen mit >=5 Kursen
+    // liegen die erste und die letzte Zeile weiter als eine Viertel-Zeilenhoehe
+    // (61.19/4 = 15.3pt) von der Zellenmitte entfernt und rasten dadurch auf
+    // der falschen Stunde ein.
+    //
+    // Die Schwelle wird deshalb jetzt aus dem Plan selbst abgeleitet: der
+    // kleinste vorkommende Zeilenabstand IST der Abstand innerhalb einer Zelle.
+    double rowSpacing = stundenYAbstand.length > 1
+        ? (stundenYAbstand.last - stundenYAbstand.first) / (stundenYAbstand.length - 1)
+        : 36.0;
+
+    // Defensiv: die Reihenfolge aus der PDF-Extraktion ist nicht garantiert.
+    for (List<TextLine> dayLines in linesInDays) {
+      dayLines.sort((a, b) => a.bounds.centerRight.dy.compareTo(b.bounds.centerRight.dy));
+    }
+
+    List<double> gaps = List.empty(growable: true);
+    for (List<TextLine> dayLines in linesInDays) {
+      for (int i = 1; i < dayLines.length; i++) {
+        double gap = dayLines[i].bounds.centerRight.dy - dayLines[i - 1].bounds.centerRight.dy;
+        // Abstaende ab ~3/4 Stundenhoehe sind sicher Zellwechsel und
+        // verfaelschen die Schaetzung des Zeilenabstands.
+        if (gap > 0.5 && gap < rowSpacing * 0.75) gaps.add(gap);
+      }
+    }
+    gaps.sort();
+    // 10. Perzentil statt Minimum: robustes Minimum, unempfindlich gegen
+    // einzelne Ausreisser aus der Textextraktion.
+    double leading = gaps.isEmpty ? rowSpacing * 0.25 : gaps[(gaps.length * 0.1).floor()];
+    // Im aktuellen Oberstufenplan liegen die Abstaende innerhalb einer Zelle bei
+    // 9.3pt, der kleinste Abstand zwischen zwei Zellen bei 23.7pt - die Schwelle
+    // liegt also mitten in einer sehr breiten Luecke. Die zusaetzliche Deckelung
+    // auf 0.4 Stundenhoehen sichert die engeren Klassenplaene (36pt) ab.
+    double blockThreshold = min(leading * 1.6, rowSpacing * 0.4);
+    double maxBlockExtent = rowSpacing * 2 - leading; // hoechstens eine Doppelstunde
+
+    void addBlock(List<TextLine> block, int tag) {
+      if (block.isEmpty) return;
+      double firstY = block.first.bounds.centerRight.dy;
+      double lastY = block.last.bounds.centerRight.dy;
+      int closestYMatch = findClosestMatchIndex((firstY + lastY) / 2, stundenWithAveragesYAbstand);
+      List<int> stundenWhereBlockTakesPlace = closestYMatch % 2 == 0 ? [closestYMatch ~/ 2] : [closestYMatch ~/ 2, closestYMatch ~/ 2 + 1];
+
+      // Sicherheitsnetz: ein Block, der hoeher ist als eine ganze Stundenzeile,
+      // kann unmoeglich in eine einzelne Stunde passen.
+      if (stundenWhereBlockTakesPlace.length == 1 && (lastY - firstY) > rowSpacing) {
+        int k = stundenWhereBlockTakesPlace.first;
+        bool nachUnten = (firstY + lastY) / 2 >= stundenYAbstand[k];
+        if (nachUnten && k + 1 < stundenYAbstand.length)
+          stundenWhereBlockTakesPlace = [k, k + 1];
+        else if (!nachUnten && k > 0) stundenWhereBlockTakesPlace = [k - 1, k];
+      }
+
+      for (TextLine textLine in block) {
+        // Strips the leading "*" PDF-Untis prints before
+        // Differenzierungskurse (e.g. "*F7 2 BSK 113" -> "F7 2 BSK 113"),
+        // and any stray junk character the PDF text extraction glues onto
+        // it when that marker glyph doesn't have a proper Unicode mapping
+        // in the embedded font (e.g. "*yF7 2" -> "F7 2"). See
+        // stripKursMarker() in database.dart.
+        stunden.add(Stunde()
+          ..name = stripKursMarker(textLine.text)
+          ..geradeWoche = gerade
+          // eigene Liste pro Stunde - nicht eine geteilte Instanz
+          ..stunden = List<int>.from(stundenWhereBlockTakesPlace)
+          ..gueltigAb = gueltigAb
+          ..tag = tag + 1);
+      }
+    }
+
     for (int tag = 0; tag < linesInDays.length; tag++) {
-      for (int stunde = 0; stunde < linesInDays[tag].length; stunde++) {
+      List<TextLine> stundenInBlock = List.empty(growable: true);
+      for (TextLine line in linesInDays[tag]) {
         if (stundenInBlock.isEmpty) {
-          stundenInBlock.add(linesInDays[tag][stunde]);
-        } else if (linesInDays[tag][stunde].bounds.centerRight.dy - stundenInBlock.last.bounds.centerRight.dy < linesInDays[tag][stunde].bounds.height) {
-          stundenInBlock.add(linesInDays[tag][stunde]);
-        } else {
-          double averageY = (stundenInBlock.first.bounds.centerRight.dy + stundenInBlock.last.bounds.centerRight.dy) / 2;
-          int closestYMatch = findClosestMatchIndex(averageY, stundenWithAveragesYAbstand);
-          List<int> stundenWhereBlockTakesPlace = closestYMatch % 2 == 0 ? [closestYMatch ~/ 2] : [closestYMatch ~/ 2, closestYMatch ~/ 2 + 1];
-
-          for (TextLine textLine in stundenInBlock) {
-            String text = textLine.text;
-            stunden.add(Stunde()
-              ..name = text
-              ..geradeWoche = gerade
-              ..stunden = stundenWhereBlockTakesPlace
-              ..gueltigAb = gueltigAb
-              ..tag = tag + 1);
-          }
-
-          //reset
-          stundenInBlock = [linesInDays[tag][stunde]];
+          stundenInBlock = [line];
+          continue;
         }
-        if (stunde == linesInDays[tag].length - 1) {
-          double averageY = (stundenInBlock.first.bounds.centerRight.dy + stundenInBlock.last.bounds.centerRight.dy) / 2;
-          int closestYMatch = findClosestMatchIndex(averageY, stundenWithAveragesYAbstand);
-          List<int> stundenWhereBlockTakesPlace = closestYMatch % 2 == 0 ? [closestYMatch ~/ 2] : [closestYMatch ~/ 2, closestYMatch ~/ 2 + 1];
-
-          for (TextLine textLine in stundenInBlock) {
-            String text = textLine.text;
-            stunden.add(Stunde()
-              ..name = text
-              ..geradeWoche = gerade
-              ..stunden = stundenWhereBlockTakesPlace
-              ..gueltigAb = gueltigAb
-              ..tag = tag + 1);
-          }
-
-          stundenInBlock = List.empty(growable: true);
+        double gap = line.bounds.centerRight.dy - stundenInBlock.last.bounds.centerRight.dy;
+        double extent = line.bounds.centerRight.dy - stundenInBlock.first.bounds.centerRight.dy;
+        if (gap <= blockThreshold && extent <= maxBlockExtent) {
+          stundenInBlock.add(line);
+        } else {
+          addBlock(stundenInBlock, tag);
+          stundenInBlock = [line];
         }
       }
+      addBlock(stundenInBlock, tag);
     }
     index += 6;
   }
@@ -371,13 +588,15 @@ Future<List<Stunde>> getStundenPlan((String stufe, PdfDocument? plan, bool isObe
 
 int findClosestMatchIndex(double target, List<double> doubleList) {
   int index = 0;
-  double minDifference = (target - doubleList[index]).abs();
+  double minDifference = (target - doubleList[0]).abs();
 
-  for (double value in doubleList) {
-    double difference = (target - value).abs();
+  // Bewusst ueber den Index iterieren: indexOf() liefert bei doppelten Werten
+  // in der Liste den falschen (naemlich den ersten) Treffer zurueck.
+  for (int i = 1; i < doubleList.length; i++) {
+    double difference = (target - doubleList[i]).abs();
     if (difference < minDifference) {
       minDifference = difference;
-      index = doubleList.indexOf(value);
+      index = i;
     }
   }
 
@@ -475,6 +694,11 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
       }
       if (tds.length == 3) {
         if (tds[2].className != "eva auftrag") throw Exception("No eva found");
+        // Eine EVA-Zeile gehört immer zu der Vertretung direkt darüber. Steht
+        // sie (durch doppeltes/kaputtes Markup) vor der ersten regulären
+        // Zeile, gibt es nichts zum Anhängen - überspringen statt mit
+        // "StateError: No element" den ganzen Vertretungsplan zu verlieren.
+        if (vertretungen.last.isEmpty) continue;
         String eva = tds[2].text;
         vertretungen.last.last.eva = vertretungen.last.last.eva == null ? eva : "${vertretungen.last.last.eva!}\n$eva";
       }
@@ -510,20 +734,18 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
 
   List<Vertretung> vertretungenFlattened = vertretungen.expand((element) => element).toList();
 
+  // Die Website liefert Tage/Blöcke teilweise mehrfach aus (doppeltes Markup),
+  // wodurch identische Einträge doppelt angezeigt würden -> hier deduplizieren.
+  final Set<String> gesehen = {};
+  vertretungenFlattened = vertretungenFlattened.where((v) => gesehen.add(_vertretungKey(v))).toList();
+
   prefs.setString("ticker", tickertext);
+  // Vergleich über einen Inhalts-Key: `stunden` ist eine Liste und wurde vorher
+  // per `==` (Referenzvergleich) geprüft, war also immer ungleich -> jede
+  // Vertretung galt als neu.
   List<Vertretung> alteVertretungen = isar.vertretungs.where().findAllSync();
-  List<Vertretung> neueVertretungen = vertretungenFlattened
-      .where((vertretung) => !alteVertretungen.any((element) =>
-          element.stunden == vertretung.stunden &&
-          element.art == vertretung.art &&
-          element.kurs == vertretung.kurs &&
-          element.raum == vertretung.raum &&
-          element.lehrkraft == vertretung.lehrkraft &&
-          element.bemerkung == vertretung.bemerkung &&
-          element.eva == vertretung.eva &&
-          element.tag == vertretung.tag &&
-          element.klasse == vertretung.klasse))
-      .toList();
+  final Set<String> alteKeys = alteVertretungen.map(_vertretungKey).toSet();
+  List<Vertretung> neueVertretungen = vertretungenFlattened.where((vertretung) => !alteKeys.contains(_vertretungKey(vertretung))).toList();
 
   await isar.writeTxn(() async {
     await isar.vertretungs.clear();
@@ -534,6 +756,18 @@ Future<List<Vertretung>> parseVertretungsplan(String vertretungsplan, Isar isar)
 
   return neueVertretungen;
 }
+
+String _vertretungKey(Vertretung v) => [
+      v.tag.toIso8601String(),
+      v.klasse,
+      v.stunden.join("-"),
+      v.art,
+      v.kurs,
+      v.raum,
+      v.lehrkraft,
+      v.bemerkung ?? "",
+      v.eva ?? "",
+    ].join("|");
 
 bool _startsWithDigit(String s) {
   return RegExp(r'^\d').hasMatch(s);

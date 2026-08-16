@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:isar_community/isar.dart';
 import '../database.dart';
@@ -25,22 +26,63 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
   bool initialized = false;
   bool? loading = false;
 
+  /// Die Filterliste, solange die Filter-Ansicht offen ist. `null` heisst
+  /// "Ansicht zu" - beim nächsten Öffnen wird wieder frisch vorbelegt.
+  ///
+  /// Bewusst als State und nicht bei jedem build aus den Prefs abgeleitet:
+  /// die Vorbelegung mit den eigenen Klassen/Stufen darf nur beim *Öffnen*
+  /// greifen. Vorher wurde sie in build() berechnet, sodass das Löschen des
+  /// letzten Chips die Liste leerte, der nächste build sie sofort wieder mit
+  /// den Standardwerten füllte und der Chip zurücksprang.
+  List<String>? _filters;
+
   @override
   void initState() {
     SharedPreferences.getInstance().then((value) {
+      if (!mounted) return;
       prefs = value;
       initialized = true;
       setState(() {
         filter = prefs.getBool("filterOn") ?? false;
+        if (filter) _filters = _seedFilters();
       });
     });
     loading = widget.loadingNotifier.value;
-    widget.loadingNotifier.addListener(() {
-      setState(() {
-        loading = widget.loadingNotifier.value;
-      });
-    });
+    // Benannte Methode statt anonymer Closure, damit sie in dispose() wieder
+    // abgemeldet werden kann - der Notifier gehört dem Elternwidget und
+    // überlebt diese Seite.
+    widget.loadingNotifier.addListener(_onLoadingChanged);
     super.initState();
+  }
+
+  void _onLoadingChanged() {
+    if (!mounted) return;
+    setState(() {
+      loading = widget.loadingNotifier.value;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.loadingNotifier.removeListener(_onLoadingChanged);
+    super.dispose();
+  }
+
+  /// Die gespeicherte Filterliste - oder, wenn sie leer ist, die Klassen/
+  /// Stufen der eigenen Stundenpläne als Vorbelegung. Wird nur beim Öffnen
+  /// der Filter-Ansicht aufgerufen, damit man drin auch alles löschen kann.
+  List<String> _seedFilters() {
+    List<String> saved = prefs.getStringList("filter") ?? [];
+    if (saved.isNotEmpty) return saved;
+    return widget.isar.konfigurations.where().findAllSync().map((k) => k.stufe).toSet().toList();
+  }
+
+  /// Übernimmt eine geänderte Filterliste - auch eine leere. Die bleibt dann
+  /// bis zum Schliessen der Ansicht leer; beim nächsten Öffnen greift
+  /// [_seedFilters] wieder.
+  void _setFilters(List<String> neu) {
+    setState(() => _filters = neu);
+    prefs.setStringList("filter", neu);
   }
 
   @override
@@ -49,7 +91,7 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
 
     int? stand = prefs.getInt("vertretungLastDownload");
     Set<DateTime> tage = widget.isar.vertretungs.where().tagProperty().findAllSync().toSet();
-    List<String> filters = prefs.getStringList("filter") ?? [];
+    List<String> filters = _filters ?? const <String>[];
     List<String> klassenFilter = filters.map((e) {
       List<String> split = e.split(" ");
       if (split.length == 1)
@@ -84,29 +126,31 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
                   spacing: 8,
                   runSpacing: -4,
                   children: [
-                    for (String filter in filters)
+                    for (String eintrag in filters)
                       InputChip(
-                        label: Text(filter),
-                        onDeleted: () {
-                          filters.remove(filter);
-                          prefs.setStringList("filter", filters);
-                          setState(() {});
-                        },
+                        label: Text(eintrag),
+                        onDeleted: () => _setFilters(filters.where((f) => f != eintrag).toList()),
                       ),
                     ActionChip(
                         label: Text("Hinzufügen"),
                         onPressed: () async {
-                          String? filter = await showDialog(
+                          TextEditingController controller = TextEditingController();
+                          String? neuerFilter = await showDialog(
                               context: context,
                               builder: (context) {
-                                TextEditingController controller = TextEditingController();
                                 return AlertDialog(
                                   title: const Text("Filter hinzufügen"),
                                   content: TextField(
                                     controller: controller,
-                                    onChanged: (value) {
-                                      controller.text = value.toUpperCase();
-                                    },
+                                    textCapitalization: TextCapitalization.characters,
+                                    // Früher wurde in onChanged `controller.text`
+                                    // neu gesetzt. Der Setter verwirft dabei die
+                                    // Cursor-Position, sodass der Cursor bei jedem
+                                    // Zeichen ans Ende sprang - wer mitten im Text
+                                    // korrigieren wollte, tippte plötzlich hinten
+                                    // weiter. Ein InputFormatter lässt den Cursor
+                                    // stehen, wo er ist.
+                                    inputFormatters: const [_UpperCaseTextFormatter()],
                                     decoration: InputDecoration(hintText: "Filter"),
                                   ),
                                   actions: [
@@ -123,10 +167,10 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
                                   ],
                                 );
                               });
-                          if (filter != null && filter.isNotEmpty) {
-                            filters.add(filter);
-                            prefs.setStringList("filter", filters);
-                            setState(() {});
+                          controller.dispose();
+                          String? eintrag = neuerFilter?.trim();
+                          if (eintrag != null && eintrag.isNotEmpty && !filters.contains(eintrag)) {
+                            _setFilters([...filters, eintrag]);
                           }
                         }),
                   ],
@@ -205,11 +249,33 @@ class _VertretungsplanPageState extends State<VertretungsplanPage> {
         onPressed: () => setState(() {
           filter = !filter;
           prefs.setBool("filterOn", filter);
+          // Beim Öffnen einmalig vorbelegen, beim Schliessen verwerfen. So
+          // lässt sich die Liste in der Ansicht komplett leeren, ohne dass
+          // die Standardwerte sofort zurückspringen - und nach Schliessen
+          // und erneutem Öffnen sind sie wieder da.
+          _filters = filter ? _seedFilters() : null;
         }),
         tooltip: 'Filter',
         child: Icon(filter ? Ionicons.filter : Ionicons.filter_outline),
       ),
     );
+  }
+}
+
+/// Schreibt die Eingabe in Grossbuchstaben, ohne die Cursor-Position zu
+/// verlieren (Klassen-/Kursfilter sind immer gross, z.B. "5A", "Q1 M GK").
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  const _UpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final String upper = newValue.text.toUpperCase();
+    if (upper == newValue.text) return newValue;
+    // toUpperCase kann die Länge ändern ("ß" -> "SS"), deshalb den Cursor um
+    // genau diese Differenz mitschieben statt den alten Offset zu übernehmen.
+    final int base = newValue.selection.baseOffset;
+    final int offset = base < 0 ? upper.length : (base + (upper.length - newValue.text.length)).clamp(0, upper.length);
+    return TextEditingValue(text: upper, selection: TextSelection.collapsed(offset: offset));
   }
 }
 

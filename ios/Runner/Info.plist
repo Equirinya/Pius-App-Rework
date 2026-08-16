@@ -28,6 +28,21 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Share-Links: piusapp://<version>/<data>
+	     See lib/share_link.dart and dev-docs/share-link.md. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>de.equirinya.piusapp.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>piusapp</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -40,12 +55,13 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-	<key>UIRequiresFullScreen</key>
-	<true/>
 	<key>UIStatusBarHidden</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Die App verwendet das Mikrofon nie.</string>
+	<!-- Ohne diesen Eintrag beendet iOS die App beim Öffnen des Scanners. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Die Kamera wird nur zum Scannen eines geteilten Stundenplan-QR-Codes verwendet.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

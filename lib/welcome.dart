@@ -3,8 +3,10 @@ import 'dart:io' show Platform;
 
 import 'package:PiusApp/background.dart';
 import 'package:PiusApp/connection.dart';
+import 'package:PiusApp/course_selection.dart';
+import 'package:PiusApp/login_fields.dart';
 import 'package:PiusApp/main.dart';
-import 'package:PiusApp/pages/stundenplan.dart';
+import 'package:PiusApp/qr_import.dart';
 import 'package:PiusApp/database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -15,7 +17,6 @@ import 'package:ionicons/ionicons.dart';
 import 'package:isar_community/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class WelcomeCarousel extends StatefulWidget {
   const WelcomeCarousel({super.key, required this.isar});
@@ -36,17 +37,19 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
   final PageController _pageController = PageController();
   TextEditingController usernameController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
-  FocusNode passwordFocus = FocusNode();
 
   int loginState = 0;
   String loginError = "";
 
-  late PdfDocument klassenplan;
-  late PdfDocument oberstufenplan;
-  List<String> klassen = List.empty(growable: true);
-  List<String> oberstufen = List.empty(growable: true);
-  List<String> stufen = List.empty(growable: true);
-  bool stufenLoading = false;
+  List<Konfiguration> importedKonfigurationen = [];
+
+  // Mirrors the old (pre-Konfigurationen) onboarding, which went straight
+  // into picking a Klasse/Stufe instead of showing an empty list first -
+  // fires once, the first time the Klasse/Kurse page is reached with no
+  // Stundenplan created yet. Afterwards (created or backed out) the normal
+  // list view takes over, so a second/third Konfiguration is still just a
+  // tap on "Erstellen" away.
+  bool _autoOpenedCourseSelection = false;
 
   @override
   void initState() {
@@ -55,7 +58,25 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
       prefs = value;
     });
     loadConfiguration();
+    // A share link tapped while onboarding is open imports through a page
+    // pushed by main.dart, i.e. outside this widget - so pick the result up
+    // once it comes back instead of showing a stale, empty list.
+    konfigurationenRevision.addListener(_onKonfigurationenChanged);
     super.initState();
+  }
+
+  void _onKonfigurationenChanged() {
+    if (!mounted) return;
+    setState(() => courseSelected = widget.isar.konfigurations.where().countSync() > 0);
+  }
+
+  @override
+  void dispose() {
+    konfigurationenRevision.removeListener(_onKonfigurationenChanged);
+    _pageController.dispose();
+    usernameController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   void loadConfiguration() async {
@@ -80,11 +101,9 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
       }
     }
 
-    if (prefs.getString("stundenplanStufe")?.isNotEmpty ?? false) {
-      //TODO
-      prefs.remove("stundenplanStufe");
+    if (widget.isar.konfigurations.where().countSync() > 0) {
       setState(() {
-        // courseSelected = true;
+        courseSelected = true;
       });
     }
   }
@@ -174,25 +193,12 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                     SizedBox(height: 8),
                     Text("Bitte logge dich mit deinem Pius-Account ein. Die Daten werden verschlüsselt und nur auf deinem Gerät gespeichert.",
                         style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-                    TextField(
-                      controller: usernameController,
-                      decoration: const InputDecoration(
-                        labelText: "Benutzername",
-                      ),
-                      onSubmitted: (String value) {
-                        passwordFocus.requestFocus();
-                      },
-                    ),
-                    TextField(
-                      focusNode: passwordFocus,
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: "Passwort",
-                      ),
-                      onSubmitted: (String value) {
-                        saveLogin();
-                      },
+                    const SizedBox(height: 8),
+                    LoginFields(
+                      usernameController: usernameController,
+                      passwordController: passwordController,
+                      enabled: loginState != 1,
+                      onSubmitted: saveLogin,
                     ),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
@@ -225,6 +231,11 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                 child: const Text("Einloggen"),
               ),
             ),
+            TextButton.icon(
+              onPressed: loginState == 1 ? null : _loginViaQr,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text("Mit QR-Code einloggen"),
+            ),
             SizedBox(height: max(MediaQuery.of(context).viewInsets.bottom, 16)),
           ],
         ),
@@ -242,92 +253,81 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                     padding: const EdgeInsets.only(top: 32, bottom: 8),
                     child: Icon(Ionicons.options_outline, size: 48, color: Theme.of(context).colorScheme.primary),
                   ),
-                  Text("Klasse/Stufe auswählen", style: Theme.of(context).textTheme.headlineMedium),
+                  Text("Klasse/Kurse auswählen", style: Theme.of(context).textTheme.headlineMedium),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      "Erstelle einen Stundenplan für dich (oder mehrere, z.B. für Geschwister). Hast du die App schon auf einem anderen Gerät, kannst du sie per QR-Code übernehmen.",
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   Expanded(
                     child: StatefulBuilder(
                       builder: (context, listSetState) {
-                        if (stufen.isEmpty) {
-                          (() async {
-                            try {
-                              final (_klassenplan, _oberstufenplan) = await getCurrentStundenplaene();
-                              klassenplan = _klassenplan;
-                              oberstufenplan = _oberstufenplan;
-
-                              klassen = await compute(getStufen, klassenplan);
-                              oberstufen = await compute(getStufen, oberstufenplan);
-                              if (context.mounted && stufen.isEmpty) {
-                                listSetState(() {
-                                  stufen.addAll(klassen);
-                                  stufen.addAll(oberstufen);
-                                });
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text("Konnte Stundenpläne nicht abrufen: $e"),
-                              ));
-                            }
-                          }).call();
-                          return const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: CupertinoActivityIndicator(),
-                          );
-                        }
-                        if (stufenLoading) {
-                          return const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: CupertinoActivityIndicator(),
-                          );
-                        }
+                        List<Konfiguration> konfigurationen = widget.isar.konfigurations.where().findAllSync();
                         return SingleChildScrollView(
-                            child: Column(
-                          children: [
-                            for (int i = 0; i < stufen.length; i++)
-                              ListTile(
-                                title: Text(stufen[i]),
-                                trailing: prefs.getString("stundenplanStufe") == stufen[i] ? const Icon(Ionicons.checkmark_circle_outline) : null,
-                                onTap: () async {
-                                  if (i < klassen.length) {
-                                    listSetState(() {
-                                      stufenLoading = true;
-                                    });
-                                    setStundenplan(
-                                        await compute(getStundenPlan, (klassen[i], klassenplan, false)), klassen[i], false, widget.isar, prefs, () {});
-                                    setState(() {
-                                      courseSelected = true;
-                                    });
-                                    listSetState(() {
-                                      stufenLoading = false;
-                                    });
-                                    if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-                                    else startApp(context);
-                                  } else {
-                                    listSetState(() {
-                                      stufenLoading = true;
-                                    });
-                                    List<Stunde> stunden = await compute(getStundenPlan, (oberstufen[i - klassen.length], oberstufenplan, true));
-                                    courseSelected =
-                                        await showStundenplanSelection(stunden, oberstufen[i - klassen.length], () => context, widget.isar, prefs, () {});
-                                    setState(() {});
-                                    listSetState(() {
-                                      stufenLoading = false;
-                                    });
-                                    if (courseSelected) {
-                                      if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-                                      else startApp(context);
-                                    }
-                                  }
-                                },
+                          child: Column(
+                            children: [
+                              for (final konfiguration in konfigurationen)
+                                ListTile(
+                                  leading: Icon(konfiguration.isOberstufe ? Icons.school_outlined : Icons.people_outline),
+                                  title: Text(konfiguration.name),
+                                  subtitle: Text("${konfiguration.isOberstufe ? "Oberstufe" : "Klasse"} ${konfiguration.stufe}"),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () async {
+                                      await deleteKonfiguration(widget.isar, konfiguration.id);
+                                      listSetState(() {});
+                                      setState(() => courseSelected = widget.isar.konfigurations.where().countSync() > 0);
+                                    },
+                                  ),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Ionicons.add),
+                                        label: const Text("Erstellen"),
+                                        onPressed: () async {
+                                          Konfiguration? result = await Navigator.of(context)
+                                              .push(MaterialPageRoute(builder: (context) => CourseSelection(isar: widget.isar)));
+                                          if (result != null) {
+                                            listSetState(() {});
+                                            setState(() => courseSelected = true);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.qr_code),
+                                        label: const Text("QR-Code"),
+                                        onPressed: () async {
+                                          List<Konfiguration>? result = await Navigator.of(context)
+                                              .push(MaterialPageRoute(builder: (context) => QrScanPage(isar: widget.isar, autoCommit: true)));
+                                          if (result != null && result.isNotEmpty) {
+                                            listSetState(() {});
+                                            setState(() => courseSelected = true);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                          ],
-                        ));
+                            ],
+                          ),
+                        );
                       },
                     ),
                   ),
                   courseSelected
                       ? FilledButton.tonal(
-                          onPressed: () {
-                            _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-                          },
+                          onPressed: _weiterVonKlasseSeite,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: const Text("Weiter"),
@@ -347,8 +347,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                                       setState(() {
                                         courseSelected = true;
                                       });
-                                      if(Platform.isIOS || Platform.isAndroid) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-                                      else startApp(context);
+                                      _weiterVonKlasseSeite();
                                     },
                                     child: const Text("Verstanden, weiter")),
                                 TextButton(
@@ -438,6 +437,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
             Expanded(
               child: PageView(
                 controller: _pageController,
+                onPageChanged: _onPageChanged,
                 children: pages,
               ),
             ),
@@ -502,9 +502,87 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                 loginState = 2;
                 loggedIn = true;
               });
+              // Erst jetzt - nach geprüften Zugangsdaten - darf der
+              // Passwortmanager das Speichern anbieten.
+              finishLoginAutofill();
               await Future.delayed(const Duration(seconds: 1));
-              _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+              if (mounted) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
             }
+
+  /// Scans a "teilen" QR-Code (see settings.dart) right from the Login page,
+  /// same as scanning one later in Settings can include Pius-Login
+  /// credentials alongside Konfigurationen - so if someone shares theirs,
+  /// this can skip typing a username/password entirely.
+  Future<void> _loginViaQr() async {
+    List<Konfiguration>? imported =
+        await Navigator.of(context).push(MaterialPageRoute(builder: (context) => QrScanPage(isar: widget.isar, autoCommit: true)));
+    if (imported == null || !mounted) return; // backed out without scanning/importing anything
+
+    if (imported.isNotEmpty) setState(() => courseSelected = true);
+
+    // QrScanPage already wrote any included credentials to secure storage -
+    // just re-read them the same way loadConfiguration() does on startup.
+    String? username = await securePrefs.read(key: "username");
+    String? password = await securePrefs.read(key: "password");
+    if (username != null && password != null && !loggedIn) {
+      usernameController.text = username;
+      passwordController.text = password;
+      try {
+        await checkCredentials();
+        if (!mounted) return;
+        setState(() => loggedIn = true);
+      } catch (e) {
+        if (kDebugMode) print("Error while logging in via QR: $e");
+      }
+    }
+
+    // The scanned code didn't include a login (just Konfigurationen, say) -
+    // stay put so the user can still log in manually.
+    if (!loggedIn) return;
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+  }
+
+  /// Verlässt die Klasse/Kurse-Seite - die letzte Seite, die es auf allen
+  /// Plattformen gibt.
+  ///
+  /// Die Benachrichtigungs-Seite dahinter existiert nur auf iOS/Android. Auf
+  /// Desktop war die Klasse/Kurse-Seite damit bereits die letzte, und
+  /// `nextPage()` dort ein No-Op: wer eine Klasse ausgewählt hatte, kam über
+  /// "Weiter" nie zu `startApp()`, "initialized" wurde nie gesetzt und die App
+  /// startete wieder im Onboarding. Nur "Überspringen" führte hinaus - also
+  /// ausgerechnet der Weg *ohne* Stundenplan.
+  void _weiterVonKlasseSeite() {
+    if (Platform.isIOS || Platform.isAndroid) {
+      _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    } else {
+      startApp(context);
+    }
+  }
+
+  void _onPageChanged(int index) {
+    // The Klasse/Kurse page is always index 2 once logged in (Willkommen ->
+    // Login -> Klasse/Kurse). Only auto-opens once, and only if nothing has
+    // been created yet - if the user swipes back and forward again, or
+    // already has Konfigurationen (e.g. re-entering onboarding), it just
+    // shows the normal list.
+    if (loggedIn && index == 2 && !courseSelected && !_autoOpenedCourseSelection) {
+      _autoOpenedCourseSelection = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _autoCreateFirstConfig());
+    }
+  }
+
+  Future<void> _autoCreateFirstConfig() async {
+    Konfiguration? result = await Navigator.of(context).push(MaterialPageRoute(builder: (context) => CourseSelection(isar: widget.isar)));
+    if (!mounted) return;
+    if (result != null) {
+      setState(() => courseSelected = true);
+    } else {
+      // Backed out without creating one - just land on the normal list view
+      // (still on the same onboarding page) instead of leaving it blank.
+      setState(() {});
+    }
+  }
 
   void startApp(BuildContext context) {
     prefs.setBool("initialized", true);

@@ -68,6 +68,11 @@ Future<void> _onBackgroundFetch(String taskId) async {
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
+    // Guards against the headless isolate winning the race against the main
+    // isolate right after an app update - e.g. a background fetch firing
+    // before the user has reopened the app once. Cheap no-op once migrated.
+    await migrateLegacyStundenplanIfNeeded(isar, prefs);
+
     // Respect the user's settings: don't fetch at all if background updates
     // are off, and don't post notifications if the user disabled them.
     if (!(prefs.getBool("background") ?? true)) return;
@@ -80,6 +85,10 @@ Future<void> _onBackgroundFetch(String taskId) async {
     neueVertretungen = await parseVertretungsplan(vertretungsplanWebsite, isar);
 
     await prefs.setInt("lastBackgroundFetch", DateTime.now().millisecondsSinceEpoch);
+    // A fetch got all the way through - drop any error recorded by an earlier
+    // run so a stale message can't outlive the problem.
+    await prefs.remove("lastBackgroundFetchError");
+    await prefs.remove("lastBackgroundFetchErrorTime");
 
     if (!showNotifications) return;
 
@@ -96,16 +105,23 @@ Future<void> _onBackgroundFetch(String taskId) async {
               alt.art == neu.art;
         }));
 
-    String? stufe = prefs.getString("stundenplanStufe");
-    bool isOberstufe = prefs.getBool("stundenplanIsOberstufe") ?? false;
+    List<Konfiguration> konfigurationen = await isar.konfigurations.where().findAll();
 
-    if (stufe != null && stufe.isNotEmpty) {
-      List<Stunde> stunden = await isar.stundes.where().findAll();
-      Set<String> kurse = stunden.map((e) {
-        List<String> split = e.name.split(" ");
-        return isOberstufe && split.length > 1 ? "${split[0]} ${split[1]}" : split[0];
-      }).toSet();
-      neueVertretungen.retainWhere((element) => element.klasse == stufe && (!isOberstufe || kurse.contains(element.kurs)));
+    if (konfigurationen.isNotEmpty) {
+      // For each Konfiguration derive the short "Fach Kursart" codes (e.g. "M GK")
+      // from its own stored Stunden, the same way the Stundenplan view does, and
+      // keep a Vertretung if it's relevant to at least one saved Konfiguration.
+      List<(String stufe, bool isOberstufe, Set<String> kurse)> relevant = [];
+      for (Konfiguration konfiguration in konfigurationen) {
+        List<Stunde> stunden = await isar.stundes.filter().konfigurationIdEqualTo(konfiguration.id).findAll();
+        // See kursKuerzel() in database.dart - derived from each line's own
+        // token count rather than guessed from isOberstufe, so Sek-I-
+        // Differenzierungsgruppen (e.g. "F7 2" vs "F7 3") aren't wrongly
+        // merged into a single "F7" and matched against every group's Vertretung.
+        Set<String> kurse = stunden.map((e) => kursKuerzel(e.name)).toSet();
+        relevant.add((konfiguration.stufe, konfiguration.isOberstufe, kurse));
+      }
+      neueVertretungen.retainWhere((vertretung) => relevant.any((k) => vertretung.klasse == k.$1 && (!k.$2 || k.$3.contains(vertretung.kurs))));
     }
 
     // Must be awaited: `BackgroundFetch.finish` below lets the OS tear the
@@ -127,6 +143,18 @@ Future<void> _onBackgroundFetch(String taskId) async {
     if (kDebugMode) {
       print("[BackgroundFetch] error during fetch: $e");
       print(s);
+    }
+    // Persist the failure so it is diagnosable in release builds. Without this
+    // the typical iOS case - the fetch runs while the device is locked, the
+    // Keychain read returns null and getSecuredPage throws "No username or
+    // password found" - leaves no trace whatsoever, and the user just reports
+    // "keine Benachrichtigungen".
+    try {
+      final SharedPreferences errorPrefs = await SharedPreferences.getInstance();
+      await errorPrefs.setString("lastBackgroundFetchError", e.toString());
+      await errorPrefs.setInt("lastBackgroundFetchErrorTime", DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {
+      // Prefs unavailable in this isolate - nothing sensible left to do.
     }
   } finally {
     await BackgroundFetch.finish(taskId);
@@ -177,6 +205,33 @@ Future<void> showNotification(String title, String body) async {
     body: "Es gibt neue Vertretungen",
     notificationDetails: notificationGroupDetails,
   );
+}
+
+/// Set once the silent catch-up request below has run, so opening the settings
+/// repeatedly doesn't hit the platform channel again.
+bool _notificationPermissionChecked = false;
+
+/// Silently makes sure the notification permission was asked for at least once,
+/// for users whose settings say notifications are on but who never saw a
+/// prompt - anyone who arrived here through an app update, since
+/// `showNotifications` defaults to true and only the onboarding page and the
+/// settings switch ever trigger a request.
+///
+/// Call this when the user opens the screen that *shows* the notification
+/// settings, never on app start: the prompt needs the surrounding context to
+/// make sense. Safe to call when permission was already granted or denied -
+/// both platforms then answer from the stored decision without showing a
+/// second prompt.
+Future<void> ensureNotificationPermissionAsked() async {
+  if (_notificationPermissionChecked) return;
+  if (!(Platform.isAndroid || Platform.isIOS)) return;
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  if (!(prefs.getBool("background") ?? true)) return;
+  if (!(prefs.getBool("showNotifications") ?? true)) return;
+
+  _notificationPermissionChecked = true;
+  await requestNotificationPermission();
 }
 
 Future<bool> requestNotificationPermission() async {
