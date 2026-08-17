@@ -36,28 +36,90 @@ import 'dart:io' show Platform;
 
 //TODO google calendar
 
-void main() async {
+/// Hintergrundfarbe des nativen Splashscreens (siehe `flutter_native_splash`
+/// in der pubspec.yaml). Der Bootstrap unten benutzt dieselbe Farbe, damit der
+/// Übergang vom nativen Splash zum ersten Flutter-Frame nicht blitzt.
+const Color _splashColor = Color(0xFF0D2A3E);
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final Isar isar = await Isar.open(
-    isarSchemas,
-    directory: (await getApplicationSupportDirectory()).path,
-  );
+  // Es wird SOFORT etwas gezeichnet.
+  //
+  // Unter iOS wird das Launch-Storyboard erst entfernt, wenn Flutter seinen
+  // ersten Frame gerendert hat. Alles, was vor `runApp()` awaited wird, kann
+  // die App also dauerhaft im Splashscreen festhalten: wirft einer dieser
+  // Aufrufe (oder kommt er nie zurück), wird `runApp()` nie erreicht, es gibt
+  // nie einen Frame - und der Nutzer sieht endlos den Splash, ohne dass
+  // irgendwo eine Fehlermeldung ankommt. Genau das war der Grund, warum die
+  // App nach dem Wechsel auf `use_frameworks! :linkage => :static` unter iOS
+  // nicht mehr hochkam, während Android weiterlief.
+  //
+  // Deshalb passiert die komplette Initialisierung jetzt in [_Bootstrap],
+  // hinter einem FutureBuilder mit Fehlerbehandlung. Ein Fehler wird zu einem
+  // lesbaren Fehlerbildschirm statt zu einem Hänger - im Release-Build und in
+  // TestFlight der einzige Weg, überhaupt zu erfahren, was schiefgeht.
+  runApp(const _Bootstrap());
+}
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+/// Ergebnis der Initialisierung: alles, was [MyApp] zum Starten braucht.
+class _StartupResult {
+  const _StartupResult(this.isar, this.prefs);
+
+  final Isar isar;
+  final SharedPreferences prefs;
+}
+
+/// Der zuletzt begonnene Initialisierungsschritt. Steht im Fehlerbildschirm,
+/// damit sofort klar ist, *welcher* Aufruf gestorben ist - ohne Xcode, ohne
+/// angeschlossenes Gerät, allein aus einem TestFlight-Screenshot.
+String _startupStep = "Start";
+
+Future<_StartupResult> _startup() async {
+  _startupStep = "getApplicationSupportDirectory()";
+  final String directory = (await getApplicationSupportDirectory()).path;
+
+  // `Isar.getInstance()` zuerst: der Background-Fetch kann die Instanz in
+  // diesem Prozess bereits geöffnet haben (siehe background.dart).
+  _startupStep = "Isar.open()";
+  final Isar isar = Isar.getInstance() ??
+      await Isar.open(
+        isarSchemas,
+        directory: directory,
+      );
+
+  _startupStep = "SharedPreferences.getInstance()";
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
 
   // One-time migration for users upgrading from the single-profile Stundenplan.
+  _startupStep = "migrateLegacyStundenplanIfNeeded()";
   await migrateLegacyStundenplanIfNeeded(isar, prefs);
 
   // Räumt eine Vertretungsplan-URL auf, die durch den früher falschen Default
   // in den Erweiterten Einstellungen festgeschrieben wurde.
+  _startupStep = "repairVertretungsplanUrlIfNeeded()";
   await repairVertretungsplanUrlIfNeeded(prefs);
 
   if (kDebugMode) {
     timeDilation = 1.0;
   }
 
+  // Benachrichtigungen und Background-Fetch werden bewusst *nicht* awaited und
+  // können den Start nicht mehr blockieren oder abschießen: nichts davon wird
+  // für den ersten Frame gebraucht.
   if (Platform.isIOS || Platform.isAndroid) {
+    unawaited(_initBackgroundStack());
+  }
+
+  _startupStep = "fertig";
+  return _StartupResult(isar, prefs);
+}
+
+/// Benachrichtigungen + Background-Fetch. Läuft neben dem ersten Frame und
+/// schluckt eigene Fehler: eine kaputte Benachrichtigungs-Initialisierung darf
+/// niemals verhindern, dass die App überhaupt startet.
+Future<void> _initBackgroundStack() async {
+  try {
     // Initialise flutter_local_notifications. `ic_stat_icon_transparent` needs
     // to exist as a drawable resource in the Android head project.
     await initializeNotifications();
@@ -66,21 +128,122 @@ void main() async {
     // possible, so terminated-app fetches can find it.
     registerBackgroundHeadlessTask();
 
-    // Deliberately not awaited so it doesn't delay the first frame.
     // Also a no-op (and stops any scheduled task) when the user has
     // background updates disabled.
-    unawaited(configureBackgroundFetch());
+    await configureBackgroundFetch();
 
     // Deliberately *no* permission request here. The system prompt belongs on
     // the screen that explains what the notifications are for - the onboarding
     // page and the Benachrichtigungen section in the settings - not in front of
     // a user who just opened the app. See requestNotificationPermission().
+  } catch (e, s) {
+    if (kDebugMode) {
+      print("Hintergrund-Initialisierung fehlgeschlagen: $e");
+      print(s);
+    }
   }
+}
 
-  runApp(MyApp(
-    isar: isar,
-    prefs: prefs,
-  ));
+class _Bootstrap extends StatefulWidget {
+  const _Bootstrap();
+
+  @override
+  State<_Bootstrap> createState() => _BootstrapState();
+}
+
+class _BootstrapState extends State<_Bootstrap> {
+  // Im State, nicht im build(): sonst würde jeder Rebuild die Initialisierung
+  // erneut anstoßen.
+  late final Future<_StartupResult> _future = _startup();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_StartupResult>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _StartupErrorApp(
+            step: _startupStep,
+            error: snapshot.error,
+            stackTrace: snapshot.stackTrace,
+          );
+        }
+        final _StartupResult? result = snapshot.data;
+        if (result == null) return const _StartupPlaceholder();
+        return MyApp(isar: result.isar, prefs: result.prefs);
+      },
+    );
+  }
+}
+
+/// Was zwischen nativem Splash und fertiger App zu sehen ist. Bewusst dieselbe
+/// Farbe wie der Splash, damit der Wechsel unsichtbar bleibt.
+class _StartupPlaceholder extends StatelessWidget {
+  const _StartupPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    // Bewusst mit MaterialApp: der Platzhalter ist die Wurzel des Baums, und
+    // ein blanker CircularProgressIndicator ohne Directionality/Theme darüber
+    // wäre genau die Art von Absturz, die dieser Umbau verhindern soll.
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const ColoredBox(
+        color: _splashColor,
+        child: Center(
+          child: SizedBox.square(
+            dimension: 32,
+            child: CircularProgressIndicator(color: Colors.white24, strokeWidth: 2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fehlerbildschirm statt Endlos-Splash. Der Text ist markierbar, damit ihn ein
+/// Nutzer aus einem Release-Build heraus einfach weiterschicken kann.
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp({required this.step, required this.error, required this.stackTrace});
+
+  final String step;
+  final Object? error;
+  final StackTrace? stackTrace;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
+      home: Scaffold(
+        backgroundColor: _splashColor,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Die App konnte nicht gestartet werden",
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Bitte schicke diesen Text an den Entwickler.",
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 24),
+                SelectableText(
+                  "Schritt: $step\n\n$error\n\n${stackTrace ?? ""}",
+                  style: const TextStyle(color: Colors.white, fontFamily: "monospace", fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Lets the deep-link handler reach a Navigator without a BuildContext.

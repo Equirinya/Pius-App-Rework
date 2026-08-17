@@ -48,4 +48,38 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+
+  # Isar erreicht seinen nativen Core über Dart-FFI und sucht die Symbole zur
+  # Laufzeit mit `DynamicLibrary.process()` - also über den Symbolnamen im
+  # fertigen App-Binary, nicht über eine Referenz, die der Linker sehen kann.
+  #
+  # Seit `use_frameworks! :linkage => :static` (siehe oben) landet alles im
+  # Runner-Binary, und im Release-Build entfernen Dead-Code-Stripping und
+  # `strip` genau die Symbole, die von nirgendwo referenziert werden. Ergebnis:
+  # `Isar.open()` wirft "Invalid argument(s): Failed to lookup symbol 'isar_...'",
+  # im Debug-Build fällt das nicht auf, in TestFlight kam die App nicht mehr hoch.
+  # Vgl. https://github.com/isar/isar/issues/1072 und .../issues/1330
+  #
+  # Falls der Startbildschirm einen anderen Fehler zeigt als einen
+  # Symbol-Lookup, kann dieser Block wieder raus.
+  #
+  # Alternative, falls das nicht reicht: global wieder auf dynamisches
+  # `use_frameworks!` zurück und nur background_fetch per pre_install-Hook auf
+  # static_library zwingen - dann bleibt der Rest der Pods unverändert.
+  installer.aggregate_targets.each do |aggregate_target|
+    user_project = aggregate_target.user_project
+    next if user_project.nil?
+
+    user_project.native_targets.each do |target|
+      next unless target.name == 'Runner'
+
+      target.build_configurations.each do |config|
+        config.build_settings['DEAD_CODE_STRIPPING'] = 'NO'
+        config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
+        config.build_settings['STRIP_STYLE'] = 'debugging'
+      end
+    end
+
+    user_project.save
+  end
 end
